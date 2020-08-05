@@ -61,7 +61,7 @@ class CFcntl {
     return _fcntl(
       arg0,
       arg1,
-      arg2 ?? null,
+      arg2,
     );
   }
 

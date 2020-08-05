@@ -178,8 +178,15 @@ class UnixPty {
     }
   }
 
-  static Future<Utf8> read(int fd) async {
-    // return IsolateRead.read(readSync, fd);
+  static void write(int fd, String data) {
+    Pointer<Utf8> utf8Pointer = Utf8.toUtf8(data);
+    cunistd.write(fd, utf8Pointer.cast(), cstring.strlen(utf8Pointer.cast()));
+  }
+
+  static IsolateRead isolateRead;
+  static Future<List<int>> read(int fd) async {
+    isolateRead ??= IsolateRead();
+    return isolateRead.read(fd);
   }
 }
 
