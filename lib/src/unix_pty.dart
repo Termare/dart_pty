@@ -60,7 +60,6 @@ class UnixPty {
 
     if (verbose) print('>>>>>>>>>>>>>>> Create End');
     if (verbose) print('>>>>>>>>>>>>>>> Ptm = $ptm');
-    setNonblock(ptm, verbose: true);
     return ptm;
     // nativeLibrary.grantpt()
   }
@@ -99,7 +98,6 @@ class UnixPty {
       cunistd.dup2(pts, 0);
       cunistd.dup2(pts, 1);
       cunistd.dup2(pts, 2);
-      String a;
 
       // Pointer<cdirent.DIR> self_dir =
       //     dirent.opendir(Utf8.toUtf8('/proc/self/fd').cast<Int8>());
