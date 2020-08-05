@@ -54,13 +54,14 @@ class CFcntl {
 
   int fcntl(
     int arg0,
-    int arg1, [
+    int arg1,
     int arg2,
-  ]) {
+  ) {
     _fcntl ??= _dylib.lookupFunction<_c_fcntl, _dart_fcntl>('fcntl');
     return _fcntl(
       arg0,
       arg1,
+      arg2 ?? null,
     );
   }
 
@@ -1103,12 +1104,10 @@ typedef _dart_creat = int Function(
 typedef _c_fcntl = ffi.Int32 Function(
   ffi.Int32 arg0,
   ffi.Int32 arg1,
+  ffi.Int32 arg2,
 );
-
-typedef _dart_fcntl = int Function(
-  int arg0,
-  int arg1,
-);
+// 改过的
+typedef _dart_fcntl = int Function(int arg0, int arg1, int arg2);
 
 typedef _c_openx_np = ffi.Int32 Function(
   ffi.Pointer<ffi.Int8> arg0,

@@ -14,6 +14,7 @@ import 'unix/ctermios.dart' hide winsize, TIOCSWINSZ;
 import 'unix/cwait.dart' hide SIG_UNBLOCK;
 import 'unix/cstdio.dart';
 import 'unix/cunistd.dart';
+import 'utils/isolate_read.dart';
 
 // TODO
 // termare;
@@ -59,6 +60,7 @@ class UnixPty {
 
     if (verbose) print('>>>>>>>>>>>>>>> Create End');
     if (verbose) print('>>>>>>>>>>>>>>> Ptm = $ptm');
+    setNonblock(ptm, verbose: true);
     return ptm;
     // nativeLibrary.grantpt()
   }
@@ -150,11 +152,18 @@ class UnixPty {
     }
   }
 
-  static Utf8 read(int fd) {
+  static void setNonblock(int fd, {bool verbose = false}) {
     int flag = -1;
-    flag = cfcntl.fcntl(fd, F_GETFL); //获取当前flag
+    flag = cfcntl.fcntl(fd, F_GETFL, 0); //获取当前flag
+    if (verbose) print('>>>>>>>> 当前flag = $flag');
     flag |= O_NONBLOCK; //设置新falg
+    if (verbose) print('>>>>>>>> 设置新flag = $flag');
     cfcntl.fcntl(fd, F_SETFL, flag); //更新flag
+    flag = cfcntl.fcntl(fd, F_GETFL, 0); //获取当前flag
+    if (verbose) print('>>>>>>>> 再次获取到的flag = $flag');
+  }
+
+  static Pointer<Utf8> readSync(int fd, {bool verbose = false}) {
     //动态申请空间
     Pointer<Utf8> str = allocate(count: 4097);
     //read函数返回从fd中读取到字符的长度
@@ -162,17 +171,23 @@ class UnixPty {
     int length = cunistd.read(fd, str.cast(), 4096);
     if (length == -1) {
       free(str);
-      return Pointer<Utf8>.fromAddress(0).ref;
+      return Pointer<Utf8>.fromAddress(0);
     } else {
       // str[length] = '\0';
-      return str.ref;
+      return str;
     }
+  }
+
+  static Future<Utf8> read(int fd) async {
+    // return IsolateRead.read(readSync, fd);
   }
 }
 
 void main() {
   int ptm = UnixPty.createPseudoTerminal();
-  init(ptm);
+  UnixPty.setNonblock(ptm, verbose: true);
+  // UnixPty.createSubprocess(ptm);
+  // init(ptm);
   print('ptm=====$ptm');
 }
 
