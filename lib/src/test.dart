@@ -1,21 +1,13 @@
-import 'dart:convert';
-import 'dart:ffi';
-import 'dart:io';
-import 'package:ffi/ffi.dart';
+import 'package:dart_pty/src/unix_pty_c.dart';
 
 void main() {
-  // StdioType.
-  // Stdio stdio = Stdio(DynamicLibrary.process());
-  // String str = '123\n';
-  // List<int> list = utf8.encode(str);
-  // print(list);
-  // Pointer<Int8> data = allocate<Int8>(count: 4);
-  // for (int i = 0; i < list.length; i++) {
-  //   data[i] = list[i];
-  // }
-  // stdio.printf(data);
-  // str = '456\n';
-  // data = Utf8.toUtf8(str).cast<Int8>();
-  // stdio.printf(data);
-  // free(data);
+  print('object');
+  UnixPtyC unixPtyC = UnixPtyC();
+  // test('adds one to input values', () {
+  //   final calculator = Calculator();
+  //   expect(calculator.addOne(2), 3);
+  //   expect(calculator.addOne(-7), -6);
+  //   expect(calculator.addOne(0), 1);
+  //   expect(() => calculator.addOne(null), throwsNoSuchMethodError);
+  // });
 }

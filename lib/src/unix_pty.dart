@@ -19,44 +19,59 @@ import 'utils/isolate_read.dart';
 // TODO
 // termare;
 class UnixPty {
-  static DynamicLibrary dynamicLibrary = DynamicLibrary.process();
-  static CFcntl cfcntl = CFcntl(dynamicLibrary);
-  static CDirent cdirent = CDirent(dynamicLibrary);
-  static CSignal csignal = CSignal(dynamicLibrary);
-  static CStdio cstdio = CStdio(dynamicLibrary);
-  static CStdlib cstdlib = CStdlib(dynamicLibrary);
-  static CString cstring = CString(dynamicLibrary);
-  static CIoctl cioctl = CIoctl(dynamicLibrary);
-  static CWait cwait = CWait(dynamicLibrary);
-  static CTermios ctermios = CTermios(dynamicLibrary);
-  static CUnistd cunistd = CUnistd(dynamicLibrary);
+  DynamicLibrary dynamicLibrary;
+  CFcntl cfcntl;
+  CDirent cdirent;
+  CSignal csignal;
+  CStdio cstdio;
+  CStdlib cstdlib;
+  CString cstring;
+  CIoctl cioctl;
+  CWait cwait;
+  CTermios ctermios;
+  CUnistd cunistd;
+  UnixPty() {
+    dynamicLibrary = DynamicLibrary.process();
+    cfcntl = CFcntl(dynamicLibrary);
+    cdirent = CDirent(dynamicLibrary);
+    csignal = CSignal(dynamicLibrary);
+    cstdio = CStdio(dynamicLibrary);
+    cstdlib = CStdlib(dynamicLibrary);
+    cstring = CString(dynamicLibrary);
+    cioctl = CIoctl(dynamicLibrary);
+    cwait = CWait(dynamicLibrary);
+    ctermios = CTermios(dynamicLibrary);
+    cunistd = CUnistd(dynamicLibrary);
+  }
   // 创建一个pty，返回它的ptm文本描述符，这个ptm在之后的读写，fork子进程还会用到
-  static int createPseudoTerminal({bool verbose = false}) {
+  int createPseudoTerminal({bool verbose = false}) {
     if (verbose) print('>>>>>>>>>>>>>>> Create Start');
-    Pointer<Int8> ptmxPath = Utf8.toUtf8("/dev/ptmx").cast<Int8>();
-    int ptm = cfcntl.open(ptmxPath, O_RDWR | O_CLOEXEC);
+    final ptmxPath = Utf8.toUtf8("/dev/ptmx");
+    int ptm = cfcntl.open(ptmxPath.cast<Int8>(), O_RDWR | O_CLOEXEC);
     if (cstdlib.grantpt(ptm) != 0 || cstdlib.unlockpt(ptm) != 0) {
       // 说明二者有一个失败
       print("Cannot grantpt()/unlockpt()/ptsname_r() on /dev/ptmx");
       return -1;
     }
-    Pointer<termios> tios = allocate();
+    Pointer<termios> tios = allocate<termios>();
     // addressOf 可以获取指针
     ctermios.tcgetattr(ptm, tios);
     tios.ref.c_iflag |= IUTF8;
     tios.ref.c_iflag &= ~(IXON | IXOFF);
     ctermios.tcsetattr(ptm, TCSANOW, tios);
+    // free(tios);
     // =========== 设置终端大小 =============
-    Pointer<winsize> size = allocate();
-    size.ref.ws_row = 30;
-    size.ref.ws_col = 54;
-    cioctl.ioctl(
-      ptm,
-      TIOCSWINSZ,
-      winsize,
-    );
+    // Pointer<winsize> size = allocate<winsize>();
+    // size.ref.ws_row = 30;
+    // size.ref.ws_col = 54;
+    // cioctl.ioctl(
+    //   ptm,
+    //   TIOCSWINSZ,
+    //   winsize,
+    // );
+    // free(size);
     // =========== 设置终端大小 =============
-    free(ptmxPath);
+    // free(ptmxPath);
 
     if (verbose) print('>>>>>>>>>>>>>>> Create End');
     if (verbose) print('>>>>>>>>>>>>>>> Ptm = $ptm');
@@ -64,8 +79,8 @@ class UnixPty {
     // nativeLibrary.grantpt()
   }
 
-  static int createSubprocess(int ptm) {
-    Pointer<Int8> devname = allocate();
+  int createSubprocess(int ptm) {
+    Pointer<Int8> devname = allocate<Int8>();
     // 获得pts路径
     devname = cstdlib.ptsname(ptm).cast();
     print('pts路径=========>${devname.cast<Utf8>().ref}');
@@ -75,11 +90,13 @@ class UnixPty {
       return -1;
     } else if (pid > 0) {
       print('fork 主进程');
+
+      /// 这里会返回子进程的pid
       return pid;
     } else {
       print('fork 子进程');
       // Clear signals which the Android java process may have blocked:
-      Pointer<Uint32> signals_to_unblock = allocate();
+      Pointer<Uint32> signals_to_unblock = allocate<Uint32>();
       // sigset_t signals_to_unblock;
       csignal.sigfillset(signals_to_unblock);
       csignal.sigprocmask(
@@ -113,6 +130,12 @@ class UnixPty {
       print('初始化环境变量');
       Map<String, String> environment =
           Map<String, String>.from(Platform.environment);
+
+      // environment['PATH'] = (Platform.isAndroid
+      //         ? '/data/data/com.nightmare/files/usr/bin:'
+      //         : FileSystemEntity.parentOf(Platform.resolvedExecutable) +
+      //             '/data/usr/bin:') +
+      // environment['PATH'];
       for (int i = 0; i < environment.keys.length; i++) {
         print(
             '${environment.keys.elementAt(i)}=${environment[environment.keys.elementAt(i)]}');
@@ -122,7 +145,9 @@ class UnixPty {
               .cast(),
         );
       }
-      cunistd.chdir(Utf8.toUtf8('/data/data/com.nightmare').cast());
+      environment['TERM'] = 'screen-256color';
+      print(environment);
+      // cunistd.chdir(Utf8.toUtf8('/data/data/com.nightmare').cast());
       cunistd.execvp(Utf8.toUtf8('sh').cast(), Pointer.fromAddress(0));
       // Pointer<Utf8> error_message;
       // if (stdio.asprintf(error_message, "exec(\"%s\")", cmd) == -1)
@@ -150,7 +175,7 @@ class UnixPty {
     }
   }
 
-  static void setNonblock(int fd, {bool verbose = false}) {
+  void setNonblock(int fd, {bool verbose = false}) {
     int flag = -1;
     flag = cfcntl.fcntl(fd, F_GETFL, 0); //获取当前flag
     if (verbose) print('>>>>>>>> 当前flag = $flag');
@@ -161,9 +186,9 @@ class UnixPty {
     if (verbose) print('>>>>>>>> 再次获取到的flag = $flag');
   }
 
-  static Pointer<Utf8> readSync(int fd, {bool verbose = false}) {
+  Pointer<Utf8> readSync(int fd, {bool verbose = false}) {
     //动态申请空间
-    Pointer<Utf8> str = allocate(count: 4097);
+    Pointer<Utf8> str = allocate<Utf8>(count: 4097);
     //read函数返回从fd中读取到字符的长度
     //读取的内容存进str,4096表示此次读取4096个字节，如果只读到10个则length为10
     int length = cunistd.read(fd, str.cast(), 4096);
@@ -176,51 +201,52 @@ class UnixPty {
     }
   }
 
-  static void write(int fd, String data) {
+  void write(int fd, String data) {
     Pointer<Utf8> utf8Pointer = Utf8.toUtf8(data);
     cunistd.write(fd, utf8Pointer.cast(), cstring.strlen(utf8Pointer.cast()));
   }
 
-  static IsolateRead isolateRead;
-  static Future<List<int>> read(int fd) async {
-    isolateRead ??= IsolateRead();
-    return isolateRead.read(fd);
+  IsolateRead isolateRead = IsolateRead();
+  Future<List<int>> read(int fd) async {
+    return await isolateRead.read(fd);
   }
 }
 
-void main() {
-  int ptm = UnixPty.createPseudoTerminal();
-  UnixPty.setNonblock(ptm, verbose: true);
-  // UnixPty.createSubprocess(ptm);
-  // init(ptm);
-  print('ptm=====$ptm');
-}
+// void main() {
+//   UnixPty unixPty = UnixPty();
+//   int ptm = unixPty.createPseudoTerminal(verbose: true);
+//   // unixPty.setNonblock(ptm, verbose: true);
+//   unixPty.createSubprocess(ptm);
+//   init(ptm);
+//   print('ptm=====$ptm');
+// }
+// 勿释放注释
+// 测试mi8lite fork卡住的代码
+// Future<void> runTimer(SendPort sendPort) async {
+//   final ReceivePort receivePort = ReceivePort();
+//   sendPort.send(receivePort.sendPort);
+//   receivePort.listen((dynamic message) {
+//     UnixPty.createSubprocess(message as int);
+//     print('来自主islate的消息===>$message');
+//   });
+//   sendPort.send('message');
+// }
 
-Future<void> runTimer(SendPort sendPort) async {
-  final ReceivePort receivePort = ReceivePort();
-  sendPort.send(receivePort.sendPort);
-  receivePort.listen((dynamic message) {
-    UnixPty.createSubprocess(message as int);
-    print('来自主islate的消息===>$message');
-  });
-  sendPort.send('message');
-}
+// Future<void> init(int ptm) async {
+//   final ReceivePort receive = ReceivePort();
+//   final Isolate isolate = await Isolate.spawn(runTimer, receive.sendPort);
+//   SendPort sendPort;
 
-Future<void> init(int ptm) async {
-  final ReceivePort receive = ReceivePort();
-  final Isolate isolate = await Isolate.spawn(runTimer, receive.sendPort);
-  SendPort sendPort;
+//   print('isolate启动');
+//   void listen(SendPort data) {
+//     sendPort = data;
+//     sendPort.send(ptm);
+//   }
 
-  print('isolate启动');
-  void listen(SendPort data) {
-    sendPort = data;
-    sendPort.send(ptm);
-  }
-
-  receive.listen((dynamic data) {
-    if (sendPort == null) {
-      listen(data as SendPort);
-    }
-    print('来自子isolate的消息====>$data');
-  });
-}
+//   receive.listen((dynamic data) {
+//     if (sendPort == null) {
+//       listen(data as SendPort);
+//     }
+//     print('====>$data');
+//   });
+// }
