@@ -6,7 +6,6 @@ import 'dart:isolate';
 
 import 'package:dart_pty/src/unix/cunistd.dart';
 import 'package:ffi/ffi.dart';
-import 'package:print_color/print_color.dart';
 
 class IsolateRead {
   IsolateRead() {
