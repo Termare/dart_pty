@@ -87,7 +87,7 @@ class NiUtf {
     if (units.last & 128 == 0) {
       // print('===>${units.last}');
       try {
-        return utf8.decode(units, allowMalformed: false);
+        return utf8.decode(units, allowMalformed: true);
       } catch (e) {
         print(units);
         print(e);
@@ -128,7 +128,7 @@ class NiUtf {
       }
     }
     try {
-      return utf8.decode(units, allowMalformed: false);
+      return utf8.decode(units, allowMalformed: true);
     } catch (e) {
       print('===>$units');
       print(e);
