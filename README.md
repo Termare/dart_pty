@@ -53,6 +53,7 @@ Future<void> main() async {
 
 ## 原理解析
 详见文章[Flutter 终端模拟器探索篇（二）| 完整终端模拟器](https://juejin.cn/post/6844904082155503629)
+
 简言之是通过 open unix 系列设备的 /dev/ptmx 节点和主要的 dup2 函数来获得的这样一个伪终端。
 ## Q&A
 ### 伪终端是否意味着他并不是一个终端？
