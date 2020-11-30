@@ -61,3 +61,36 @@ Future<void> main() async {
 但这类成对的节点非常少，并且对普通用户来说，它们是不可知的，我们并不知道哪些是成对的。但我们可以通过 open /dev/ptmx 的方式来获得一对成对的节点，即为伪终端
 几乎所有的日常使用的终端模拟器都是伪终端。
 
+### 能不用集成 so 库就能实现本地终端吗？
+
+与 xuty 在 20 年暑假的时候其实就已经实现了，他采用了 isolate 来解决了读文件描述符会阻塞 UI 线程的问题，但 isolate 是不能热重载的，并且当终端数量过多的时候，vscode 就会显示一堆 isolate runtime。
+
+而我想要通过设置文件描述符非阻塞的方式来实现，终端的创建与子进程的 fork 都没有问题，但在执行以下代码的时候，发现了差异性。
+在 PC 上能够正常的运行，而在 android 设备上失效，跟设备上`flag`的宏定义应该有关系，只要能找出`O_NONBLOCK`这个宏在安卓上的定义值就能解决。
+
+```dart
+  void setNonblock(int fd, {bool verbose = false}) {
+    int flag = -1;
+    flag = cfcntl.fcntl(fd, F_GETFL, 0); //获取当前flag
+    if (verbose) print('>>>>>>>> 当前flag = $flag');
+    flag |= O_NONBLOCK; //设置新falg
+    if (verbose) print('>>>>>>>> 设置新flag = $flag');
+    cfcntl.fcntl(fd, F_SETFL, flag); //更新flag
+    flag = cfcntl.fcntl(fd, F_GETFL, 0); //获取当前flag
+    if (verbose) print('>>>>>>>> 再次获取到的flag = $flag');
+  }
+```
+
+这段 dart 代码原本的 c 语言代码为：
+
+```c
+void setNonblock(int fd)
+{
+    int flag = -1;
+    flag = fcntl(fd, F_GETFL); //获取当前flag
+    flag |= O_NONBLOCK;        //设置新falg
+    fcntl(fd, F_SETFL, flag);  //更新flag
+}
+```
+
+> 详见 [term.c](c_resource/termare/src/term.c)
