@@ -11,10 +11,14 @@ class UnixPtyC {
   final NiUtf _niUtf = NiUtf();
   final Map<String, String> environment;
   final String libPath;
+  final int rowLen;
+  final int columnLen;
   CTermare cTermare;
   int pseudoTerminalId;
 
   UnixPtyC({
+    this.rowLen = 25,
+    this.columnLen = 80,
     this.libPath = 'libterm.so',
     this.environment = const <String, String>{
       'TERM': 'screen-256color',
@@ -23,7 +27,7 @@ class UnixPtyC {
     DynamicLibrary dynamicLibrary;
     dynamicLibrary = DynamicLibrary.open(libPath);
     cTermare = CTermare(dynamicLibrary);
-    pseudoTerminalId = cTermare.create_ptm(51, 47);
+    pseudoTerminalId = cTermare.create_ptm(rowLen, columnLen);
     print('<- pseudoTerminalId:$pseudoTerminalId ->');
     final Pointer<Pointer<Utf8>> argv = allocate<Pointer<Utf8>>(count: 1);
 
