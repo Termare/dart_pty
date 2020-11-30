@@ -1,15 +1,27 @@
+import 'dart:io';
+
 import 'package:dart_pty/src/unix_pty_c.dart';
 
 Future<void> main() async {
   Map<String, String> environment = {'TEST': 'TEST_VALUE'};
-  UnixPtyC unixPthC = UnixPtyC(environment: environment);
-  unixPthC.write('env\n');
+  UnixPtyC unixPthC = UnixPtyC(
+    environment: environment,
+    libPath: 'dynamic_library/libterm.dylib',
+  );
   await Future.delayed(Duration(milliseconds: 100));
   String result;
-  // result = unixPthC.read();
-  // print('result->$result');
-  unixPthC.write('echo \$TEST\n');
-  await Future.delayed(Duration(milliseconds: 100));
-  result = unixPthC.read();
-  print('result->$result');
+  unixPthC.read();
+  await Future.delayed(Duration(milliseconds: 100), () async {
+    while (true) {
+      print('请向终端输入一些东西');
+      String input = stdin.readLineSync();
+      unixPthC.write(input + '\n');
+      await Future.delayed(Duration(milliseconds: 200));
+      result = unixPthC.read();
+      print('\x1b[31m' + '-' * 20 + 'result' + '-' * 20);
+      print('result -> $result');
+      print('-' * 20 + 'result' + '-' * 20 + '\x1b[0m');
+      await Future.delayed(Duration(milliseconds: 100));
+    }
+  });
 }
