@@ -4,8 +4,8 @@ Language: [English](README.md) | 中文简体
 
 ## 介绍
 
-创建一个伪终端并执行一个子进程。
-
+创建一个伪终端并执行一个子进程。也是终端模拟器的底层实现。
+与语言提供的执行进程不同，它不仅能够无缓冲的拿到 stdout、stderr 输出，
 ## 使用方法
 参考 [test.dart](test/test.dart)
 ```dart
@@ -33,4 +33,4 @@ Future<void> main() async {
   });
 }
 ```
-[截图](screencap/screencap.png)
+![截图](screencap/screencap.png)
