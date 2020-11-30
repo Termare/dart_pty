@@ -10,23 +10,18 @@ import 'utils/custom_utf.dart';
 class UnixPtyC {
   final NiUtf _niUtf = NiUtf();
   final Map<String, String> environment;
+  final String libPath;
   CTermare cTermare;
   int pseudoTerminalId;
+
   UnixPtyC({
+    this.libPath = 'libterm.so',
     this.environment = const <String, String>{
       'TERM': 'screen-256color',
     },
   }) {
     DynamicLibrary dynamicLibrary;
-    if (!Platform.isAndroid) {
-      dynamicLibrary = DynamicLibrary.open(
-        '/Users/nightmare/Desktop/termare-space/dart_pty/lib/src/libterm.dylib',
-      );
-    } else {
-      dynamicLibrary = DynamicLibrary.open(
-        'libterm.so',
-      );
-    }
+    dynamicLibrary = DynamicLibrary.open(libPath);
     cTermare = CTermare(dynamicLibrary);
     pseudoTerminalId = cTermare.create_ptm(51, 47);
     print('<- pseudoTerminalId:$pseudoTerminalId ->');
