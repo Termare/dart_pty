@@ -1,6 +1,6 @@
 # dart_pty
 
-Language: [English](README.md) | 中文简体
+Language: [English](README-EN.md) | 中文简体
 
 ## 介绍
 
