@@ -28,7 +28,7 @@ class UnixPtyC {
     dynamicLibrary = DynamicLibrary.open(libPath);
     cTermare = CTermare(dynamicLibrary);
     pseudoTerminalId = cTermare.create_ptm(rowLen, columnLen);
-    print('<- pseudoTerminalId:$pseudoTerminalId ->');
+    print('<- pseudoTerminalId : $pseudoTerminalId ->');
     final Pointer<Pointer<Utf8>> argv = allocate<Pointer<Utf8>>(count: 1);
 
     ///    将双重指针的第一个一级指针赋值为空
@@ -132,7 +132,7 @@ class UnixPtyC {
     // free(argv);
     // free(envp);
     // free(processId);
-    print('processId.value->${processId.value}');
+    print('<- processId.value : ${processId.value} ->');
     // read();
   }
 
