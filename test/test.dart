@@ -6,7 +6,9 @@ Future<void> main() async {
   Map<String, String> environment = {'TEST': 'TEST_VALUE'};
   UnixPtyC unixPthC = UnixPtyC(
     environment: environment,
-    libPath: 'dynamic_library/libterm.dylib',
+    libPath: Platform.isMacOS
+        ? 'dynamic_library/libterm.dylib'
+        : 'dynamic_library/libterm.so',
   );
   await Future.delayed(Duration(milliseconds: 100));
   String result;
