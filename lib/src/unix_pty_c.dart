@@ -13,10 +13,12 @@ class UnixPtyC {
   final String libPath;
   final int rowLen;
   final int columnLen;
+  final String exec;
   CTermare cTermare;
   int pseudoTerminalId;
 
   UnixPtyC({
+    this.exec = 'sh',
     this.rowLen = 25,
     this.columnLen = 80,
     this.libPath = 'libterm.so',
@@ -103,23 +105,20 @@ class UnixPtyC {
     /// shPath为需要C Native 执行的程序路径
     /// 由终端的特性，这个命令一般是sh或者bash或其他类似的程序
     /// 并且一般不带参数，所以上面的argv为空
-    String shPath;
 
-    /// 即使是在安卓设备上，sh也是能在环境变量中找到的
-    /// 由于在App的数据目录中可能会存在busybox链接出来的sh，它与系统自带的sh存在差异
-    /// 如果直接执行sh就会优先执行数据目录的sh，所以指定为/system/bin/sh
     ///
     ///
-    if (Platform.isAndroid) {
-      if (File('/data/data/com.nightmare/files/usr/bin/login').existsSync()) {
-        shPath = 'login';
-      } else
-        shPath = '/system/bin/sh';
-    } else
-      shPath = 'bash';
+    ///// TODO
+    // if (Platform.isAndroid) {
+    //   if (File('/data/data/com.nightmare/files/usr/bin/login').existsSync()) {
+    //     shPath = 'login';
+    //   } else
+    //     shPath = '/system/bin/sh';
+    // } else
+    //   shPath = 'bash';
     cTermare.create_subprocess(
       Pointer<Int8>.fromAddress(0),
-      Utf8.toUtf8(shPath).cast(),
+      Utf8.toUtf8(exec).cast(),
       Utf8.toUtf8('/').cast(),
       argv.cast(),
       envp.cast(),
