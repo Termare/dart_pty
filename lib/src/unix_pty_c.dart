@@ -21,13 +21,17 @@ class UnixPtyC {
     this.exec = 'sh',
     this.rowLen = 25,
     this.columnLen = 80,
-    this.libPath = 'libterm.so',
+    this.libPath,
     this.environment = const <String, String>{
       'TERM': 'screen-256color',
     },
   }) {
     DynamicLibrary dynamicLibrary;
-    dynamicLibrary = DynamicLibrary.open(libPath);
+    if (libPath != null) {
+      dynamicLibrary = DynamicLibrary.open(libPath);
+    } else {
+      dynamicLibrary = DynamicLibrary.process();
+    }
     cTermare = CTermare(dynamicLibrary);
     pseudoTerminalId = cTermare.create_ptm(rowLen, columnLen);
     print('<- pseudoTerminalId : $pseudoTerminalId ->');
@@ -52,35 +56,6 @@ class UnixPtyC {
       platformEnvironment[key] = environment[key];
     }
 
-    /// 将当前App的bin目录也添加进这个环境变量
-    // environment['PATH'] = (Platform.isAndroid
-    //         ? '${EnvirPath.filesPath}/usr/bin:'
-    //         : FileSystemEntity.parentOf(Platform.resolvedExecutable) +
-    //             '/data/usr/bin:') +
-    //     environment['PATH'];
-
-    /// 申请内存空间，空间数为列元素个数加1，最后的空间用来设置空指针，好让原生的循环退出
-    // int envpLength = environment.length + 1 + platformEnvironment.length;
-    // envp = allocate<Pointer<Utf8>>(
-    //   count: envpLength,
-    // );
-
-    // /// 将Map内容拷贝到二维数组
-    // for (int i = 0; i < platformEnvironment.keys.length; i++) {
-    //   envp[i] = Utf8.toUtf8(
-    //     '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}',
-    //   );
-    // }
-    // for (int i = 0; i < environment.keys.length; i++) {
-    //   envp[i] = Utf8.toUtf8(
-    //     '${environment.keys.elementAt(i)}=${environment[environment.keys.elementAt(i)]}',
-    //   );
-    // }
-    // // 设置当前终端的类型
-    // // envp[environment.keys.length] = Utf8.toUtf8('TERM=screen');
-
-    // ///  末元素赋值空指针
-    // envp[envpLength - 1] = Pointer<Utf8>.fromAddress(0);
     envp = allocate<Pointer<Utf8>>(count: platformEnvironment.keys.length + 1);
 
     /// 将Map内容拷贝到二维数组
