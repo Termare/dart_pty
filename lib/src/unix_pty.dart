@@ -14,6 +14,7 @@ import 'unix/ctermios.dart' hide winsize, TIOCSWINSZ;
 import 'unix/cwait.dart' hide SIG_UNBLOCK;
 import 'unix/cstdio.dart';
 import 'unix/cunistd.dart';
+import 'utils/custom_utf.dart';
 import 'utils/isolate_read.dart';
 
 // TODO
@@ -30,7 +31,20 @@ class UnixPty {
   CWait cwait;
   CTermios ctermios;
   CUnistd cunistd;
-  UnixPty() {
+  final NiUtf _niUtf = NiUtf();
+  final Map<String, String> environment;
+  final int rowLen;
+  final int columnLen;
+  final String exec;
+  int pseudoTerminalId;
+  UnixPty({
+    this.environment = const <String, String>{
+      'TERM': 'screen-256color',
+    },
+    this.rowLen = 25,
+    this.columnLen = 80,
+    this.exec = 'sh',
+  }) {
     dynamicLibrary = DynamicLibrary.process();
     cfcntl = CFcntl(dynamicLibrary);
     cdirent = CDirent(dynamicLibrary);
@@ -42,6 +56,9 @@ class UnixPty {
     cwait = CWait(dynamicLibrary);
     ctermios = CTermios(dynamicLibrary);
     cunistd = CUnistd(dynamicLibrary);
+    pseudoTerminalId = createPseudoTerminal();
+    createSubprocess(pseudoTerminalId);
+    setNonblock(pseudoTerminalId);
   }
   // 创建一个pty，返回它的ptm文本描述符，这个ptm在之后的读写，fork子进程还会用到
   int createPseudoTerminal({bool verbose = false}) {
@@ -61,20 +78,21 @@ class UnixPty {
     ctermios.tcsetattr(ptm, TCSANOW, tios);
     // free(tios);
     // =========== 设置终端大小 =============
-    // Pointer<winsize> size = allocate<winsize>();
-    // size.ref.ws_row = 30;
-    // size.ref.ws_col = 54;
-    // cioctl.ioctl(
-    //   ptm,
-    //   TIOCSWINSZ,
-    //   winsize,
-    // );
-    // free(size);
+    Pointer<winsize> size = allocate<winsize>();
+    size.ref.ws_row = rowLen;
+    size.ref.ws_col = columnLen;
+    cioctl.ioctl(
+      ptm,
+      TIOCSWINSZ,
+      winsize,
+    );
+    free(size);
     // =========== 设置终端大小 =============
     // free(ptmxPath);
 
     if (verbose) print('>>>>>>>>>>>>>>> Create End');
     if (verbose) print('>>>>>>>>>>>>>>> Ptm = $ptm');
+
     return ptm;
     // nativeLibrary.grantpt()
   }
@@ -128,9 +146,12 @@ class UnixPty {
       //   dirent.closedir(self_dir);
       // }
       print('初始化环境变量');
-      Map<String, String> environment =
-          Map<String, String>.from(Platform.environment);
-
+      final Map<String, String> platformEnvironment = Map.from(
+        Platform.environment,
+      );
+      for (String key in environment.keys) {
+        platformEnvironment[key] = environment[key];
+      }
       // environment['PATH'] = (Platform.isAndroid
       //         ? '/data/data/com.nightmare/files/usr/bin:'
       //         : FileSystemEntity.parentOf(Platform.resolvedExecutable) +
@@ -138,15 +159,13 @@ class UnixPty {
       // environment['PATH'];
       for (int i = 0; i < environment.keys.length; i++) {
         print(
-            '${environment.keys.elementAt(i)}=${environment[environment.keys.elementAt(i)]}');
+            '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}');
         cstdlib.putenv(
           Utf8.toUtf8(
-                  '${environment.keys.elementAt(i)}=${environment[environment.keys.elementAt(i)]}')
+                  '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}')
               .cast(),
         );
       }
-      environment['TERM'] = 'screen-256color';
-      print(environment);
       // cunistd.chdir(Utf8.toUtf8('/data/data/com.nightmare').cast());
       cunistd.execvp(Utf8.toUtf8('sh').cast(), Pointer.fromAddress(0));
       // Pointer<Utf8> error_message;
@@ -186,12 +205,12 @@ class UnixPty {
     if (verbose) print('>>>>>>>> 再次获取到的flag = $flag');
   }
 
-  Pointer<Utf8> readSync(int fd, {bool verbose = false}) {
+  Pointer<Utf8> readSync({bool verbose = false}) {
     //动态申请空间
     Pointer<Utf8> str = allocate<Utf8>(count: 4097);
     //read函数返回从fd中读取到字符的长度
     //读取的内容存进str,4096表示此次读取4096个字节，如果只读到10个则length为10
-    int length = cunistd.read(fd, str.cast(), 4096);
+    int length = cunistd.read(pseudoTerminalId, str.cast(), 4096);
     if (length == -1) {
       free(str);
       return Pointer<Utf8>.fromAddress(0);
@@ -201,15 +220,32 @@ class UnixPty {
     }
   }
 
-  void write(int fd, String data) {
-    Pointer<Utf8> utf8Pointer = Utf8.toUtf8(data);
-    cunistd.write(fd, utf8Pointer.cast(), cstring.strlen(utf8Pointer.cast()));
+  String read() {
+    // print('读取');
+    final Pointer<Uint8> resultPoint = readSync().cast();
+    // 代表空指针
+    if (resultPoint.address == 0) {
+      // 释放内存
+      // free(resultPoint);
+      return '';
+    }
+    String result = _niUtf.cStringtoString(resultPoint);
+    return result;
   }
 
-  IsolateRead isolateRead = IsolateRead();
-  Future<List<int>> read(int fd) async {
-    return await isolateRead.read(fd);
+  void write(String data) {
+    Pointer<Utf8> utf8Pointer = Utf8.toUtf8(data);
+    cunistd.write(
+      pseudoTerminalId,
+      utf8Pointer.cast(),
+      cstring.strlen(utf8Pointer.cast()),
+    );
   }
+
+  // IsolateRead isolateRead = IsolateRead();
+  // Future<List<int>> read(int fd) async {
+  //   return await isolateRead.read(fd);
+  // }
 }
 
 // void main() {
