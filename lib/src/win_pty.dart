@@ -5,10 +5,12 @@ import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart' as win32;
 
 import 'pseudo_terminal.dart';
+import 'utils/custom_utf.dart';
 import 'utils/globals.dart';
 import 'win_proc.dart';
 
 class WinPty implements PseudoTerminal {
+  final NiUtf _niUtf = NiUtf();
   WinPty() {
     final size = win32.COORD.allocate();
     size.X = 80;
