@@ -1,8 +1,7 @@
 import 'dart:io';
 
-import 'package:dart_pty/dart_pty.dart';
-
 import 'proc.dart';
+import 'unix_pty_c.dart';
 import 'win_pty.dart';
 
 // 抽象函数的思想完全借鉴 pty 的代码.
@@ -17,11 +16,13 @@ abstract class PseudoTerminal {
       // TODO
       String dylibPath = '';
       if (Platform.isMacOS) {
-        dylibPath = 'dynamic_library/libterm.dylib';
+        dylibPath =
+            '/Users/nightmare/Desktop/termare-space/dart_pty/dynamic_library/libterm.dylib';
       } else if (Platform.isLinux) {
         dylibPath = 'dynamic_library/libterm.so';
-      } else if (Platform.isAndroid) {}
-      dylibPath = 'libterm.so';
+      } else if (Platform.isAndroid) {
+        dylibPath = 'libterm.so';
+      }
       return UnixPtyC(
         rowLen: row,
         columnLen: column,

@@ -12,6 +12,7 @@ Future<void> main() async {
   }
   pseudoTerminal.createSubprocess(
     executable,
+    environment: environment,
   );
   await Future.delayed(Duration(milliseconds: 100));
   String result;
@@ -22,7 +23,7 @@ Future<void> main() async {
       String input = stdin.readLineSync();
       pseudoTerminal.write(input + '\n');
       await Future.delayed(Duration(milliseconds: 200));
-      result = await pseudoTerminal.read();
+      result = pseudoTerminal.readSync();
       print('\x1b[31m' + '-' * 20 + 'result' + '-' * 20);
       print('result -> $result');
       print('-' * 20 + 'result' + '-' * 20 + '\x1b[0m');

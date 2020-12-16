@@ -123,7 +123,7 @@ class UnixPtyC implements PseudoTerminal {
     cTermare.create_subprocess(
       Pointer<Int8>.fromAddress(0),
       Utf8.toUtf8(executable).cast(),
-      Utf8.toUtf8('/').cast(),
+      Utf8.toUtf8('.').cast(),
       argv.cast(),
       envp.cast(),
       processId,
@@ -145,8 +145,7 @@ class UnixPtyC implements PseudoTerminal {
   }
 
   @override
-  Future<String> read() {
-    // TODO: implement read
-    throw UnimplementedError();
+  Future<String> read() async {
+    return readSync();
   }
 }
