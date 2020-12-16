@@ -4,11 +4,11 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart' as win32;
 
-import 'pty.dart';
+import 'pseudo_terminal.dart';
 import 'utils/globals.dart';
 import 'win_proc.dart';
 
-class WinPty implements Pty {
+class WinPty implements PseudoTerminal {
   WinPty() {
     final size = win32.COORD.allocate();
     size.X = 80;
@@ -91,11 +91,11 @@ class WinPty implements Pty {
   }
 
   @override
-  WinProc exec(
+  WinProc createSubprocess(
     String executable, {
     String workingDirectory = '.',
     List<String> arguments,
-    List<String> environment,
+    Map<String, String> environment,
   }) {
     final si = win32.STARTUPINFOEX.allocate();
     // ZeroMemory(&si, sizeof(si));

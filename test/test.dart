@@ -1,47 +1,28 @@
 import 'dart:io';
 
-import 'package:dart_pty/src/pty.dart';
+import 'package:dart_pty/src/pseudo_terminal.dart';
 import 'package:dart_pty/src/unix_pty_c.dart';
 
 Future<void> main() async {
-  if (Platform.isWindows) {
-    Pty pty = Pty();
-    pty.exec('C:\\windows\\system32\\cmd.exe');
-    await Future.delayed(Duration(milliseconds: 100));
-    String result;
-    // pty.read();
-    await Future.delayed(Duration(milliseconds: 100), () async {
-      while (true) {
-        print('请向终端输入一些东西');
-        String input = stdin.readLineSync();
-        pty.write(input + '\n\r');
-        await Future.delayed(Duration(milliseconds: 200));
-        result = await pty.read();
-        print('\x1b[31m' + '-' * 20 + 'result' + '-' * 20);
-        print('result -> $result');
-        print('-' * 20 + 'result' + '-' * 20 + '\x1b[0m');
-        await Future.delayed(Duration(milliseconds: 100));
-      }
-    });
-    return;
-  }
   Map<String, String> environment = {'TEST': 'TEST_VALUE'};
-  UnixPtyC unixPthC = UnixPtyC(
-    environment: environment,
-    libPath: Platform.isMacOS
-        ? 'dynamic_library/libterm.dylib'
-        : 'dynamic_library/libterm.so',
+  PseudoTerminal pseudoTerminal = PseudoTerminal();
+  String executable = 'sh';
+  if (Platform.isWindows) {
+    executable = 'cmd';
+  }
+  pseudoTerminal.createSubprocess(
+    executable,
   );
   await Future.delayed(Duration(milliseconds: 100));
   String result;
-  unixPthC.read();
+  print('第一次进程的输出为:${pseudoTerminal.readSync()}');
   await Future.delayed(Duration(milliseconds: 100), () async {
     while (true) {
       print('请向终端输入一些东西');
       String input = stdin.readLineSync();
-      unixPthC.write(input + '\n');
+      pseudoTerminal.write(input + '\n');
       await Future.delayed(Duration(milliseconds: 200));
-      result = unixPthC.read();
+      result = await pseudoTerminal.read();
       print('\x1b[31m' + '-' * 20 + 'result' + '-' * 20);
       print('result -> $result');
       print('-' * 20 + 'result' + '-' * 20 + '\x1b[0m');
