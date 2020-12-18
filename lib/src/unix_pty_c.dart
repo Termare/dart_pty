@@ -123,7 +123,7 @@ class UnixPtyC implements PseudoTerminal {
     cTermare.create_subprocess(
       Pointer<Int8>.fromAddress(0),
       Utf8.toUtf8(executable).cast(),
-      Utf8.toUtf8('.').cast(),
+      Utf8.toUtf8(workingDirectory).cast(),
       argv.cast(),
       envp.cast(),
       processId,
