@@ -24,9 +24,10 @@ abstract class PseudoTerminal {
       } else if (Platform.isAndroid) {
         dylibPath = 'libterm.so';
       }
-      return UnixPty(
+      return UnixPtyC(
         rowLen: row,
         columnLen: column,
+        libPath: dylibPath,
       );
     }
   }
