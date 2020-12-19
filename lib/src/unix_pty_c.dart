@@ -6,6 +6,7 @@ import 'package:dart_pty/src/proc.dart';
 import 'package:ffi/ffi.dart';
 
 import 'pseudo_terminal.dart';
+import 'unix/cstdlib.dart';
 import 'unix/term.dart';
 import 'utils/custom_utf.dart';
 
@@ -147,5 +148,18 @@ class UnixPtyC implements PseudoTerminal {
   @override
   Future<String> read() async {
     return readSync();
+  }
+
+  @override
+  String getTtyPath() {
+    CStdlib cstdlib;
+    DynamicLibrary dynamicLibrary = DynamicLibrary.process();
+    cstdlib = CStdlib(dynamicLibrary);
+    Pointer<Int8> devname = allocate<Int8>();
+    // 获得pts路径
+    devname = cstdlib.ptsname(pseudoTerminalId).cast();
+    String result = Utf8.fromUtf8(devname.cast());
+    free(devname);
+    return result;
   }
 }

@@ -46,5 +46,6 @@ abstract class PseudoTerminal {
     Map<String, String> environment,
   });
 
+  String getTtyPath();
   // void close();
 }

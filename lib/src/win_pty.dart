@@ -165,6 +165,12 @@ class WinPty implements PseudoTerminal {
 
     return WinProc(pi.hProcess, _hPC.value);
   }
+
+  @override
+  String getTtyPath() {
+    // TODO: implement getTtyPath
+    throw UnimplementedError();
+  }
 }
 
 String rawRead(int hFile) {

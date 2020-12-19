@@ -14,6 +14,7 @@ Future<void> main() async {
     executable,
     environment: environment,
   );
+  print('pseudoTerminal -> ${pseudoTerminal.getTtyPath()}');
   await Future.delayed(Duration(milliseconds: 100));
   String result;
   print('第一次进程的输出为:${pseudoTerminal.readSync()}');
