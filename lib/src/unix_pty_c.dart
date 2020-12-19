@@ -56,6 +56,7 @@ class UnixPtyC implements PseudoTerminal {
     cTermare.write_to_fd(pseudoTerminalId, Utf8.toUtf8(data).cast());
   }
 
+  @override
   String readSync() {
     // print('读取');
     final Pointer<Uint8> resultPoint =
@@ -66,7 +67,7 @@ class UnixPtyC implements PseudoTerminal {
       // free(resultPoint);
       return '';
     }
-    String result = _niUtf.cStringtoString(resultPoint);
+    final String result = _niUtf.cStringtoString(resultPoint);
     return result;
   }
 

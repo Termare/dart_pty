@@ -15,7 +15,7 @@ Future<void> main() async {
     environment: environment,
   );
   print('pseudoTerminal -> ${pseudoTerminal.getTtyPath()}');
-  await Future.delayed(Duration(milliseconds: 100));
+  await Future<void>.delayed(Duration(milliseconds: 100));
   String result;
   print('第一次进程的输出为:${pseudoTerminal.readSync()}');
   await Future.delayed(Duration(milliseconds: 100), () async {
@@ -23,12 +23,12 @@ Future<void> main() async {
       print('请向终端输入一些东西');
       String input = stdin.readLineSync();
       pseudoTerminal.write(input + '\n');
-      await Future.delayed(Duration(milliseconds: 200));
+      await Future<void>.delayed(Duration(milliseconds: 200));
       result = pseudoTerminal.readSync();
       print('\x1b[31m' + '-' * 20 + 'result' + '-' * 20);
       print('result -> $result');
       print('-' * 20 + 'result' + '-' * 20 + '\x1b[0m');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future<void>.delayed(Duration(milliseconds: 100));
     }
   });
 }

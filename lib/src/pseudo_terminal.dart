@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'proc.dart';
+import 'unix_pty.dart';
 import 'unix_pty_c.dart';
 import 'win_pty.dart';
 
@@ -23,10 +24,9 @@ abstract class PseudoTerminal {
       } else if (Platform.isAndroid) {
         dylibPath = 'libterm.so';
       }
-      return UnixPtyC(
+      return UnixPty(
         rowLen: row,
         columnLen: column,
-        libPath: dylibPath,
       );
     }
   }
