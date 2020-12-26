@@ -100,7 +100,7 @@ class UnixPty implements PseudoTerminal {
     // nativeLibrary.grantpt()
   }
 
-  Proc createSubprocess(
+  Proc _createSubprocess(
     String executable, {
     String workingDirectory = '.',
     List<String> arguments,

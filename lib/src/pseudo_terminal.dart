@@ -10,6 +10,12 @@ abstract class PseudoTerminal {
   factory PseudoTerminal({
     int row = 25,
     int column = 80,
+    String executable,
+    String workingDirectory = '.',
+    List<String> arguments,
+    Map<String, String> environment = const <String, String>{
+      'TERM': 'screen-256color',
+    },
   }) {
     if (Platform.isWindows) {
       return WinPty();
@@ -28,6 +34,10 @@ abstract class PseudoTerminal {
         rowLen: row,
         columnLen: column,
         libPath: dylibPath,
+        workingDirectory: workingDirectory,
+        executable: executable,
+        arguments: arguments,
+        environment: environment,
       );
     }
   }
@@ -40,12 +50,12 @@ abstract class PseudoTerminal {
 
   void resize(int row, int column);
 
-  Proc createSubprocess(
-    String executable, {
-    String workingDirectory = '.',
-    List<String> arguments,
-    Map<String, String> environment,
-  });
+  // Proc createSubprocess(
+  //   String executable, {
+  //   String workingDirectory = '.',
+  //   List<String> arguments,
+  //   Map<String, String> environment,
+  // });
 
   String getTtyPath();
   // void close();

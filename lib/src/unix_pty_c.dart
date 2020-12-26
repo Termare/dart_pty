@@ -8,21 +8,19 @@ import 'package:ffi/ffi.dart';
 import 'pseudo_terminal.dart';
 import 'unix/cstdlib.dart';
 import 'unix/term.dart';
+import 'unix_proc.dart';
 import 'utils/custom_utf.dart';
 
 // 这个需要配合c语言实现
 class UnixPtyC implements PseudoTerminal {
-  final NiUtf _niUtf = NiUtf();
-  final String libPath;
-  final int rowLen;
-  final int columnLen;
-  CTermare cTermare;
-  int pseudoTerminalId;
-
   UnixPtyC({
     this.rowLen,
     this.columnLen,
     this.libPath,
+    String executable,
+    String workingDirectory,
+    List<String> arguments,
+    Map<String, String> environment,
   }) {
     DynamicLibrary dynamicLibrary;
     if (libPath != null) {
@@ -33,7 +31,19 @@ class UnixPtyC implements PseudoTerminal {
     cTermare = CTermare(dynamicLibrary);
     pseudoTerminalId = cTermare.create_ptm(rowLen, columnLen);
     print('<- pseudoTerminalId : $pseudoTerminalId ->');
+    _createSubprocess(
+      executable,
+      workingDirectory: workingDirectory,
+      arguments: arguments,
+      environment: environment,
+    );
   }
+  final NiUtf _niUtf = NiUtf();
+  final String libPath;
+  final int rowLen;
+  final int columnLen;
+  CTermare cTermare;
+  int pseudoTerminalId;
 
   // void read() async {
   //   while (true) {
@@ -71,14 +81,11 @@ class UnixPtyC implements PseudoTerminal {
     return result;
   }
 
-  @override
-  Proc createSubprocess(
+  Proc _createSubprocess(
     String executable, {
-    String workingDirectory = '.',
+    String workingDirectory,
     List<String> arguments,
-    Map<String, String> environment = const <String, String>{
-      'TERM': 'screen-256color',
-    },
+    Map<String, String> environment,
   }) {
     final Pointer<Pointer<Utf8>> argv = allocate<Pointer<Utf8>>(count: 1);
 
@@ -139,6 +146,7 @@ class UnixPtyC implements PseudoTerminal {
     // free(processId);
     print('<- processId.value : ${processId.value} ->');
     // read();
+    return UnixProc(pid);
   }
 
   @override

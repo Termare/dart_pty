@@ -4,14 +4,13 @@ import 'package:dart_pty/src/pseudo_terminal.dart';
 import 'package:dart_pty/src/unix_pty_c.dart';
 
 Future<void> main() async {
-  Map<String, String> environment = {'TEST': 'TEST_VALUE'};
-  PseudoTerminal pseudoTerminal = PseudoTerminal();
+  final Map<String, String> environment = {'TEST': 'TEST_VALUE'};
   String executable = 'sh';
   if (Platform.isWindows) {
     executable = 'cmd';
   }
-  pseudoTerminal.createSubprocess(
-    executable,
+  final PseudoTerminal pseudoTerminal = PseudoTerminal(
+    executable: executable,
     environment: environment,
   );
   print('pseudoTerminal -> ${pseudoTerminal.getTtyPath()}');
