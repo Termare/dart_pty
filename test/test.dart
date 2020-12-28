@@ -24,7 +24,7 @@ Future<void> main() async {
       input.split('').forEach((element) {
         pseudoTerminal.write(element);
       });
-      pseudoTerminal.write('\r\n');
+      pseudoTerminal.write('\n');
       await Future<void>.delayed(const Duration(milliseconds: 200));
       result = await pseudoTerminal.read();
       print('\x1b[31m' + '-' * 20 + 'result' + '-' * 20);
