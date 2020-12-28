@@ -6,7 +6,7 @@ Future<void> main() async {
   final Map<String, String> environment = {'TEST': 'TEST_VALUE'};
   String executable = 'sh';
   if (Platform.isWindows) {
-    executable = 'cmd';
+    executable = 'wsl';
   }
   final PseudoTerminal pseudoTerminal = PseudoTerminal(
     executable: executable,
