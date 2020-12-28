@@ -10,8 +10,9 @@ import 'utils/globals.dart';
 import 'win_proc.dart';
 
 class WinPty implements PseudoTerminal {
-  final NiUtf _niUtf = NiUtf();
-  WinPty() {
+  WinPty({
+    String executable,
+  }) {
     final size = win32.COORD.allocate();
     size.X = 80;
     size.Y = 25;
@@ -47,6 +48,7 @@ class WinPty implements PseudoTerminal {
       print('CreatePseudoConsole failed.');
       return;
     }
+    _createSubprocess(executable);
   }
 
   int _input;
@@ -92,8 +94,7 @@ class WinPty implements PseudoTerminal {
     print('written ${written.value}');
   }
 
-  @override
-  WinProc createSubprocess(
+  WinProc _createSubprocess(
     String executable, {
     String workingDirectory = '.',
     List<String> arguments,
@@ -128,13 +129,14 @@ class WinPty implements PseudoTerminal {
     }
 
     ret = win32.UpdateProcThreadAttribute(
-        si.lpAttributeList,
-        0,
-        win32.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-        Pointer.fromAddress(_hPC.value),
-        sizeOf<IntPtr>(),
-        nullptr,
-        nullptr);
+      si.lpAttributeList,
+      0,
+      win32.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
+      Pointer.fromAddress(_hPC.value),
+      sizeOf<IntPtr>(),
+      nullptr,
+      nullptr,
+    );
 
     print('UpdateProcThreadAttribute $ret.');
 
@@ -143,16 +145,17 @@ class WinPty implements PseudoTerminal {
     final pi = win32.PROCESS_INFORMATION.allocate();
 
     ret = win32.CreateProcess(
-        nullptr,
-        Utf16.toUtf16(executable),
-        nullptr,
-        nullptr,
-        win32.FALSE,
-        win32.EXTENDED_STARTUPINFO_PRESENT,
-        nullptr,
-        nullptr,
-        si.addressOf,
-        pi.addressOf);
+      nullptr,
+      Utf16.toUtf16(executable),
+      nullptr,
+      nullptr,
+      win32.FALSE,
+      win32.EXTENDED_STARTUPINFO_PRESENT,
+      nullptr,
+      nullptr,
+      si.addressOf,
+      pi.addressOf,
+    );
 
     print('CreateProcess $ret.');
 
@@ -168,8 +171,9 @@ class WinPty implements PseudoTerminal {
 
   @override
   String getTtyPath() {
-    // TODO: implement getTtyPath
-    throw UnimplementedError();
+    return '';
+    // // TODO: implement getTtyPath
+    // throw UnimplementedError();
   }
 }
 
@@ -188,11 +192,20 @@ String rawRead(int hFile) {
     return null;
   } else {
     buffer.elementAt(readlen.value).value = 0;
-    final result = Utf8.fromUtf8(buffer.cast());
-
-    free(readlen);
-    free(buffer);
-
+    // final result = Utf8.fromUtf8(buffer.cast());
+    // free(readlen);
+    // free(buffer);
+    // return result; // print('读取');
+    final Pointer<Uint8> resultPoint = buffer.cast();
+    // 代表空指针
+    if (resultPoint.address == 0) {
+      // 释放内存
+      // free(resultPoint);
+      return '';
+    }
+    final String result = _niUtf.cStringtoString(resultPoint);
     return result;
   }
 }
+
+final NiUtf _niUtf = NiUtf();

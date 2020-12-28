@@ -15,14 +15,18 @@ Future<void> main() async {
   print('pseudoTerminal -> ${pseudoTerminal.getTtyPath()}');
   await Future<void>.delayed(const Duration(milliseconds: 100));
   String result;
-  print('第一次进程的输出为:${pseudoTerminal.readSync()}');
+  print('第一次进程的输出为:${await pseudoTerminal.read()}');
+  // return;
   await Future.delayed(const Duration(milliseconds: 100), () async {
     while (true) {
       print('请向终端输入一些东西');
       final String input = stdin.readLineSync();
-      pseudoTerminal.write(input + '\n');
+      input.split('').forEach((element) {
+        pseudoTerminal.write(element);
+      });
+      pseudoTerminal.write('\r\n');
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      result = pseudoTerminal.readSync();
+      result = await pseudoTerminal.read();
       print('\x1b[31m' + '-' * 20 + 'result' + '-' * 20);
       print('result -> $result');
       print('-' * 20 + 'result' + '-' * 20 + '\x1b[0m');
