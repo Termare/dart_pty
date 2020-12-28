@@ -25,13 +25,13 @@ class WinPty implements PseudoTerminal {
     final pipe1 = win32.CreatePipe(inputReadSide, inputWriteSide, nullptr, 0);
     final pipe2 = win32.CreatePipe(outputReadSide, outputWriteSide, nullptr, 0);
 
-    print('pipe1 $pipe1');
-    print('pipe2 $pipe2');
+    // print('pipe1 $pipe1');
+    // print('pipe2 $pipe2');
 
-    print('inputReadSide   ${inputReadSide.value}.');
-    print('outputWriteSide ${outputWriteSide.value}.');
-    print('outputReadSide  ${outputReadSide.value}.');
-    print('inputWriteSide  ${inputWriteSide.value}.');
+    // print('inputReadSide   ${inputReadSide.value}.');
+    // print('outputWriteSide ${outputWriteSide.value}.');
+    // print('outputReadSide  ${outputReadSide.value}.');
+    // print('inputWriteSide  ${inputWriteSide.value}.');
 
     _input = inputWriteSide.value;
     _output = outputReadSide.value;
@@ -41,11 +41,11 @@ class WinPty implements PseudoTerminal {
     final hr = win32.CreatePseudoConsole(size.addressOf.cast<IntPtr>().value,
         inputReadSide.value, outputWriteSide.value, 0, _hPC);
 
-    print('hr $hr');
-    print('hPC ${_hPC.value}');
+    // print('hr $hr');
+    // print('hPC ${_hPC.value}');
 
     if (win32.FAILED(hr)) {
-      print('CreatePseudoConsole failed.');
+      // print('CreatePseudoConsole failed.');
       return;
     }
     _createSubprocess(executable);
@@ -90,8 +90,8 @@ class WinPty implements PseudoTerminal {
     // unistd.write(_ptm, cstr.cast(), units.length);
     final ret =
         win32.WriteFile(_input, cstr, data.codeUnits.length, written, nullptr);
-    print('WriteFile $ret');
-    print('written ${written.value}');
+    // print('WriteFile $ret');
+    // print('written ${written.value}');
   }
 
   WinProc _createSubprocess(
@@ -178,15 +178,15 @@ class WinPty implements PseudoTerminal {
 }
 
 String rawRead(int hFile) {
-  print('rawRead');
+  // print('rawRead');
   const bufsize = 4096;
   final buffer = allocate<Int8>(count: bufsize + 1);
   final readlen = allocate<Uint32>();
 
   win32.ReadFile(hFile, buffer, bufsize, readlen, nullptr);
 
-  print('ReadFile done');
-  print('readlen ${readlen.value}');
+  // print('ReadFile done');
+  // print('readlen ${readlen.value}');
 
   if (readlen.value == -1) {
     return null;
