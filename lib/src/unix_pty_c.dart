@@ -6,7 +6,6 @@ import 'package:dart_pty/src/proc.dart';
 import 'package:ffi/ffi.dart';
 
 import 'pseudo_terminal.dart';
-import 'unix/cstdlib.dart';
 import 'unix/term.dart';
 import 'unix_proc.dart';
 import 'utils/custom_utf.dart';
@@ -63,7 +62,7 @@ class UnixPtyC implements PseudoTerminal {
   //   }
   // }
   void write(String data) {
-    cTermare.write_to_fd(pseudoTerminalId, Utf8.toUtf8(data).cast());
+    cTermare.write_to_fd(pseudoTerminalId, data.toNativeUtf8().cast());
   }
 
   @override
@@ -87,7 +86,7 @@ class UnixPtyC implements PseudoTerminal {
     List<String> arguments,
     Map<String, String> environment,
   }) {
-    final Pointer<Pointer<Utf8>> argv = allocate<Pointer<Utf8>>(count: 1);
+    final Pointer<Pointer<Utf8>> argv = malloc.allocate<Pointer<Utf8>>(1);
 
     ///    将双重指针的第一个一级指针赋值为空
     ///    等价于
@@ -108,13 +107,13 @@ class UnixPtyC implements PseudoTerminal {
       platformEnvironment[key] = environment[key];
     }
 
-    envp = allocate<Pointer<Utf8>>(count: platformEnvironment.keys.length + 1);
+    envp = malloc.allocate<Pointer<Utf8>>(platformEnvironment.keys.length + 1);
 
     /// 将Map内容拷贝到二维数组
     for (int i = 0; i < platformEnvironment.keys.length; i++) {
-      envp[i] = Utf8.toUtf8(
-        '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}',
-      );
+      envp[i] =
+          '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}'
+              .toNativeUtf8();
     }
     // 设置当前终端的类型
     // envp[environment.keys.length] = Utf8.toUtf8('TERM=screen');
@@ -124,15 +123,15 @@ class UnixPtyC implements PseudoTerminal {
 
     /// 定义一个指向int的指针
     /// 是C语言中常用的方法，指针为双向传递，可以由调用的函数来直接更改这个值
-    final Pointer<Int32> processId = allocate();
+    final Pointer<Int32> processId = malloc.allocate(1);
 
     /// 初始化为0
     processId.value = 0;
 
     cTermare.create_subprocess(
       Pointer<Int8>.fromAddress(0),
-      Utf8.toUtf8(executable).cast(),
-      Utf8.toUtf8(workingDirectory).cast(),
+      executable.toNativeUtf8().cast(),
+      workingDirectory.toNativeUtf8().cast(),
       argv.cast(),
       envp.cast(),
       processId,
@@ -161,14 +160,15 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   String getTtyPath() {
-    CStdlib cstdlib;
-    DynamicLibrary dynamicLibrary = DynamicLibrary.process();
-    cstdlib = CStdlib(dynamicLibrary);
-    Pointer<Int8> devname = allocate<Int8>();
-    // 获得pts路径
-    devname = cstdlib.ptsname(pseudoTerminalId).cast();
-    String result = Utf8.fromUtf8(devname.cast());
-    free(devname);
-    return result;
+    throw UnimplementedError();
+    // CStdlib cstdlib;
+    // DynamicLibrary dynamicLibrary = DynamicLibrary.process();
+    // cstdlib = CStdlib(dynamicLibrary);
+    // Pointer<Int8> devname = allocate<Int8>();
+    // // 获得pts路径
+    // devname = cstdlib.ptsname(pseudoTerminalId).cast();
+    // String result = Utf8.fromUtf8(devname.cast());
+    // free(devname);
+    // return result;
   }
 }

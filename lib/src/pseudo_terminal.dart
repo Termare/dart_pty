@@ -18,9 +18,10 @@ abstract class PseudoTerminal {
     },
   }) {
     if (Platform.isWindows) {
-      return WinPty(
-        executable: executable,
-      );
+      // TODO
+      // return WinPty(
+      //   executable: executable,
+      // );
     } else {
       // TODO
       String dylibPath = '';
