@@ -198,3 +198,9 @@ char *get_output_from_fd(int fd)
         return str;
     }
 }
+
+void setPtyWindowSize(int fd, int rows, int cols)
+{
+    struct winsize sz = {.ws_row = (unsigned short)rows, .ws_col = (unsigned short)cols};
+    ioctl(fd, TIOCSWINSZ, &sz);
+}

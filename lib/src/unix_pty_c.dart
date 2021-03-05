@@ -129,7 +129,7 @@ class UnixPtyC implements PseudoTerminal {
     processId.value = 0;
 
     cTermare.create_subprocess(
-      Pointer<Int8>.fromAddress(0),
+      nullptr,
       executable.toNativeUtf8().cast(),
       workingDirectory.toNativeUtf8().cast(),
       argv.cast(),
@@ -150,6 +150,7 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   void resize(int row, int column) {
+    cTermare.setPtyWindowSize(pseudoTerminalId, row, column);
     // TODO: implement resize
   }
 

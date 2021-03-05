@@ -14,4 +14,5 @@ void setNonblock(int fd);
 char *get_output_from_fd(int fd);
 char *getFilePathFromFd(int fd);
 typedef void (*callback)(char *p);
+void setPtyWindowSize(int fd, int rows, int cols);
 callback dart_print;
