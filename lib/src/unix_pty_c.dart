@@ -86,7 +86,7 @@ class UnixPtyC implements PseudoTerminal {
     List<String> arguments,
     Map<String, String> environment,
   }) {
-    final Pointer<Pointer<Utf8>> argv = malloc.allocate<Pointer<Utf8>>(1);
+    final Pointer<Pointer<Utf8>> argv = nullptr;
 
     ///    将双重指针的第一个一级指针赋值为空
     ///    等价于
@@ -94,20 +94,21 @@ class UnixPtyC implements PseudoTerminal {
     ///    p[1] = 0;    p[1] = NULL;    *p = 0;   *p = NULL;
     ///    上一行的4个语句都是等价的
     ///    将第一个指针赋值为空的原因是C语言端遍历这个argv的方法是通过判断当前指针是否为空作为循环的退出条件
-    argv[0] = Pointer<Utf8>.fromAddress(0);
+    // argv[0] = nullptr;
 
     /// 定义一个二级指针，用来保存当前终端的环境信息，这个二级指针对应C语言中的二维数组
-    Pointer<Pointer<Utf8>> envp;
 
     ///
     final Map<String, String> platformEnvironment = Map.from(
       Platform.environment,
     );
-    for (String key in environment.keys) {
+    for (final String key in environment.keys) {
       platformEnvironment[key] = environment[key];
     }
 
-    envp = malloc.allocate<Pointer<Utf8>>(platformEnvironment.keys.length + 1);
+    final Pointer<Pointer<Utf8>> envp = calloc<Pointer<Utf8>>(
+      platformEnvironment.length + 1,
+    );
 
     /// 将Map内容拷贝到二维数组
     for (int i = 0; i < platformEnvironment.keys.length; i++) {
@@ -115,15 +116,13 @@ class UnixPtyC implements PseudoTerminal {
           '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}'
               .toNativeUtf8();
     }
-    // 设置当前终端的类型
-    // envp[environment.keys.length] = Utf8.toUtf8('TERM=screen');
 
     ///  末元素赋值空指针
-    envp[platformEnvironment.keys.length] = Pointer<Utf8>.fromAddress(0);
+    envp[platformEnvironment.length] = nullptr;
 
     /// 定义一个指向int的指针
     /// 是C语言中常用的方法，指针为双向传递，可以由调用的函数来直接更改这个值
-    final Pointer<Int32> processId = malloc.allocate(1);
+    final Pointer<Int32> processId = calloc<Int32>(1);
 
     /// 初始化为0
     processId.value = 0;
@@ -140,9 +139,9 @@ class UnixPtyC implements PseudoTerminal {
     cTermare.setNonblock(pseudoTerminalId);
     // TODO
     /// 释放动态申请的空间
-    // free(argv);
-    // free(envp);
-    // free(processId);
+    malloc.free(argv);
+    malloc.free(envp);
+    // malloc.free(processId);
     print('<- processId.value : ${processId.value} ->');
     // read();
     return UnixProc(pid);
@@ -151,7 +150,6 @@ class UnixPtyC implements PseudoTerminal {
   @override
   void resize(int row, int column) {
     cTermare.setPtyWindowSize(pseudoTerminalId, row, column);
-    // TODO: implement resize
   }
 
   @override
