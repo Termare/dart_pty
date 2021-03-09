@@ -42,6 +42,8 @@ class UnixPtyC implements PseudoTerminal {
   final int rowLen;
   final int columnLen;
   CTermare cTermare;
+
+  @override
   int pseudoTerminalId;
 
   // void read() async {
@@ -137,10 +139,10 @@ class UnixPtyC implements PseudoTerminal {
       pseudoTerminalId,
     );
     cTermare.setNonblock(pseudoTerminalId);
-    // TODO
+
     /// 释放动态申请的空间
-    malloc.free(argv);
-    malloc.free(envp);
+    calloc.free(argv);
+    calloc.free(envp);
     // malloc.free(processId);
     print('<- processId.value : ${processId.value} ->');
     // read();

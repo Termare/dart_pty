@@ -45,6 +45,8 @@ abstract class PseudoTerminal {
     }
   }
 
+  int pseudoTerminalId;
+
   String readSync();
 
   Future<String> read();
