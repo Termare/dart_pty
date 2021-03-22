@@ -13,20 +13,12 @@
 #ifdef __APPLE__
 #define LACKS_PTSNAME_R
 #endif
-// 以防万一需要有所有的函数
-void init_dart_print(callback dartprint)
-{
-    dart_print = dartprint;
-}
 
-//这是回调java的方法，用来报错
-// static int throw_runtime_exception(JNIEnv* env, char const* message)
-// {
-//     jclass exClass = (*env)->FindClass(env, "java/lang/RuntimeException");
-//     (*env)->ThrowNew(env, exClass, message);
-//     return -1;
-// }
-//这个方法用来创建一个进程
+Callback dart_print;
+void init_dart_print(Callback callback)
+{
+    dart_print = callback;
+}
 //cmd  执行程序
 //cwd  当前工作目录
 //argv 参数，类似于["-i","-c"]
@@ -35,6 +27,7 @@ int create_ptm(
     int rows,
     int columns)
 {
+    dart_print("hhhhh");
     //调用open这个路径会随机获得一个大于0的整形值
     // dartprint("创建终端中");
     int ptm = open("/dev/ptmx", O_RDWR | O_CLOEXEC);
@@ -68,10 +61,40 @@ int create_ptm(
     ioctl(ptm, TIOCSWINSZ, &sz);
     return ptm;
 }
-// int main(int argc, char** argv){
-//     create_subprocess("",argv[1],argv[2],argv[3]);
+// int main(int argc, char **argv, char **env)
+// {
+//     if (env)
+//         for (; *env; ++env)
+//             printf("%s\n", *env);
+//     int ptm = create_ptm(25, 80);
+//     printf("PseudoTerminal ->%d\n", ptm);
+//     int *pid;
+//     create_subprocess(NULL, "sh", ".", NULL, env, pid, ptm);
+//     printf("processID -> %d\n", *pid);
 //     return 0;
 // }
+
+int *thread(Callback callback)
+{
+
+    pthread_t newthid;
+
+    newthid = pthread_self();
+    printf("this is a new thread, thread ID = %d\n", newthid);
+    callback("hhhhh");
+    return NULL;
+}
+void post_thread(int ptmfd, Callback callback)
+{
+    pthread_t thid;
+    callback("asdasdasd");
+    printf("main thread ,ID is %d\n", pthread_self());
+    if (pthread_create(&thid, NULL, (void *)thread, callback) != 0)
+    {
+        printf("thread creation failed\n");
+        exit(1);
+    }
+}
 void create_subprocess(char *env,
                        char const *cmd,
                        char const *cwd,
@@ -80,6 +103,7 @@ void create_subprocess(char *env,
                        int *pProcessId,
                        int ptmfd)
 {
+    // printf("asdd");
 #ifdef LACKS_PTSNAME_R
     char *devname;
 #else
@@ -108,6 +132,7 @@ void create_subprocess(char *env,
         // // dup2(pts, 0);
         // dup2(pts, 1);
         // dup2(pts, 2);
+
         return;
     }
     else

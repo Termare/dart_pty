@@ -47,9 +47,9 @@ abstract class PseudoTerminal {
 
   int pseudoTerminalId;
 
-  String readSync();
+  List<int> readSync();
 
-  Future<String> read();
+  Future<List<int>> read();
 
   void write(String data);
 

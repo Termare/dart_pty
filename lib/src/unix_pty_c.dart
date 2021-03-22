@@ -10,7 +10,18 @@ import 'unix/term.dart';
 import 'unix_proc.dart';
 import 'utils/custom_utf.dart';
 
+typedef callback = Void Function(); //注意void 和Void的区别
+typedef testCallBack_func = Int32 Function(
+    Pointer<NativeFunction<callback>> func);
+typedef TestCallBack = int Function(Pointer<NativeFunction<callback>> func);
+
 // 这个需要配合c语言实现
+
+void dartCallback(Pointer<Int8> int8) {
+  Pointer<Utf8> utf8Pointer = int8.cast();
+  print(utf8Pointer.toDartString());
+}
+
 class UnixPtyC implements PseudoTerminal {
   UnixPtyC({
     this.rowLen,
@@ -28,6 +39,9 @@ class UnixPtyC implements PseudoTerminal {
       dynamicLibrary = DynamicLibrary.process();
     }
     cTermare = CTermare(dynamicLibrary);
+    Pointer<NativeFunction<Callback>> callback =
+        Pointer.fromFunction<Callback>(dartCallback);
+    cTermare.init_dart_print(callback);
     pseudoTerminalId = cTermare.create_ptm(rowLen, columnLen);
     print('<- pseudoTerminalId : $pseudoTerminalId ->');
     _createSubprocess(
@@ -68,7 +82,7 @@ class UnixPtyC implements PseudoTerminal {
   }
 
   @override
-  String readSync() {
+  List<int> readSync() {
     // print('读取');
     final Pointer<Uint8> resultPoint =
         cTermare.get_output_from_fd(pseudoTerminalId).cast();
@@ -76,9 +90,9 @@ class UnixPtyC implements PseudoTerminal {
     if (resultPoint.address == 0) {
       // 释放内存
       // free(resultPoint);
-      return '';
+      return [];
     }
-    final String result = _niUtf.cStringtoString(resultPoint);
+    final List<int> result = _niUtf.getCodeUnits(resultPoint);
     return result;
   }
 
@@ -138,6 +152,9 @@ class UnixPtyC implements PseudoTerminal {
       processId,
       pseudoTerminalId,
     );
+    // Pointer<NativeFunction<Callback>> callback =
+    //     Pointer.fromFunction<Callback>(dartCallback);
+    // cTermare.post_thread(pseudoTerminalId, callback);
     cTermare.setNonblock(pseudoTerminalId);
 
     /// 释放动态申请的空间
@@ -155,7 +172,7 @@ class UnixPtyC implements PseudoTerminal {
   }
 
   @override
-  Future<String> read() async {
+  Future<List<int>> read() async {
     return readSync();
   }
 

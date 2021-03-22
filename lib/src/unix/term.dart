@@ -121,6 +121,32 @@ class CTermare {
   }
 
   _dart_setPtyWindowSize _setPtyWindowSize;
+
+  void init_dart_print(
+    ffi.Pointer<ffi.NativeFunction<Callback>> callback,
+  ) {
+    return (_init_dart_print ??=
+        _lookup<ffi.NativeFunction<_c_init_dart_print>>('init_dart_print')
+            .asFunction<_dart_init_dart_print>())(
+      callback,
+    );
+  }
+
+  _dart_init_dart_print _init_dart_print;
+
+  void post_thread(
+    int ptmfd,
+    ffi.Pointer<ffi.NativeFunction<Callback>> callback,
+  ) {
+    return (_post_thread ??=
+        _lookup<ffi.NativeFunction<_c_post_thread>>('post_thread')
+            .asFunction<_dart_post_thread>())(
+      ptmfd,
+      callback,
+    );
+  }
+
+  _dart_post_thread _post_thread;
 }
 
 typedef _c_create_ptm = ffi.Int32 Function(
@@ -199,6 +225,24 @@ typedef _dart_setPtyWindowSize = void Function(
   int cols,
 );
 
-typedef callback = ffi.Void Function(
+typedef Callback = ffi.Void Function(
   ffi.Pointer<ffi.Int8>,
+);
+
+typedef _c_init_dart_print = ffi.Void Function(
+  ffi.Pointer<ffi.NativeFunction<Callback>> callback,
+);
+
+typedef _dart_init_dart_print = void Function(
+  ffi.Pointer<ffi.NativeFunction<Callback>> callback,
+);
+
+typedef _c_post_thread = ffi.Void Function(
+  ffi.Int32 ptmfd,
+  ffi.Pointer<ffi.NativeFunction<Callback>> callback,
+);
+
+typedef _dart_post_thread = void Function(
+  int ptmfd,
+  ffi.Pointer<ffi.NativeFunction<Callback>> callback,
 );
