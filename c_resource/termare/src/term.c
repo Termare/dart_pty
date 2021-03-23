@@ -81,13 +81,13 @@ int *thread(Callback callback)
 
     newthid = pthread_self();
     printf("this is a new thread, thread ID = %d\n", newthid);
-    callback("hhhhh");
+    callback("子线程打印");
     return NULL;
 }
 void post_thread(int ptmfd, Callback callback)
 {
     pthread_t thid;
-    callback("asdasdasd");
+    callback("主线程打印");
     printf("main thread ,ID is %d\n", pthread_self());
     if (pthread_create(&thid, NULL, (void *)thread, callback) != 0)
     {
