@@ -16,6 +16,7 @@ abstract class PseudoTerminal {
     Map<String, String> environment = const <String, String>{
       'TERM': 'screen-256color',
     },
+    String libPath,
   }) {
     if (Platform.isWindows) {
       // TODO
@@ -24,19 +25,18 @@ abstract class PseudoTerminal {
       // );
     } else {
       // TODO
-      String dylibPath = '';
       if (Platform.isMacOS) {
-        dylibPath =
+        libPath ??=
             '/Users/nightmare/Desktop/termare-space/dart_pty/dynamic_library/libterm.dylib';
       } else if (Platform.isLinux) {
-        dylibPath = 'dynamic_library/libterm.so';
+        libPath ??= 'dynamic_library/libterm.so';
       } else if (Platform.isAndroid) {
-        dylibPath = 'libterm.so';
+        libPath ??= 'libterm.so';
       }
       return UnixPtyC(
         rowLen: row,
         columnLen: column,
-        libPath: dylibPath,
+        libPath: libPath,
         workingDirectory: workingDirectory,
         executable: executable,
         arguments: arguments,
