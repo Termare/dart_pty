@@ -208,10 +208,10 @@ void setNonblock(int fd)
 char *get_output_from_fd(int fd)
 {
     //动态申请空间
-    char *str = (char *)malloc((4097) * sizeof(char));
+    char *str = (char *)malloc((81921) * sizeof(char));
     //read函数返回从fd中读取到字符的长度
     //读取的内容存进str,4096表示此次读取4096个字节，如果只读到10个则length为10
-    int length = read(fd, str, 4096);
+    int length = read(fd, str, 81920);
     if (length == -1)
     {
         free(str);
