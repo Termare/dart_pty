@@ -28,8 +28,8 @@ abstract class PseudoTerminal {
       if (Platform.isMacOS) {
         print('\x1b[32m您将 dart_paty 运行在 macOS 下，请注意 so 库的引入 ');
         libPath = Platform.resolvedExecutable.replaceAll(
-          RegExp('.app/.*'),
-          '.app/',
+          RegExp('\.app/.*'),
+          r'.app/',
         );
         libPath += 'Contents/Frameworks/App.framework/';
         libPath += 'Resources/flutter_assets/assets/lib/libterm.dylib';
