@@ -14,7 +14,7 @@ abstract class PseudoTerminal {
     String workingDirectory = '.',
     List<String> arguments,
     Map<String, String> environment = const <String, String>{
-      'TERM': 'screen-256color',
+      'TERM': 'xterm-256color',
     },
     String libPath,
   }) {
