@@ -26,8 +26,13 @@ abstract class PseudoTerminal {
     } else {
       // TODO
       if (Platform.isMacOS) {
-        libPath ??=
-            '/Users/nightmare/Desktop/termare-space/dart_pty/dynamic_library/libterm.dylib';
+        print('\x1b[32m您将 dart_paty 运行在 macOS 下，请注意 so 库的引入 ');
+        libPath = Platform.resolvedExecutable.replaceAll(
+          RegExp('.app/.*'),
+          '.app/',
+        );
+        libPath += 'Contents/Frameworks/App.framework/';
+        libPath += 'Resources/flutter_assets/assets/lib/libterm.dylib';
       } else if (Platform.isLinux) {
         libPath ??= 'dynamic_library/libterm.so';
       } else if (Platform.isAndroid) {
