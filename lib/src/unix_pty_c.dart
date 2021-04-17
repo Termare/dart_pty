@@ -102,7 +102,13 @@ class UnixPtyC implements PseudoTerminal {
     List<String> arguments,
     Map<String, String> environment,
   }) {
-    final Pointer<Pointer<Utf8>> argv = nullptr;
+    final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
+      arguments.length + 1,
+    );
+    for (int i = 0; i < arguments.length; i++) {
+      argv[i] = arguments[i].toNativeUtf8();
+    }
+    argv[arguments.length] = nullptr;
 
     ///    将双重指针的第一个一级指针赋值为空
     ///    等价于
