@@ -124,6 +124,7 @@ class UnixPtyC implements PseudoTerminal {
     final Map<String, String> platformEnvironment = Map.from(
       Platform.environment,
     );
+    platformEnvironment['LANG'] = 'en_US.UTF-8';
     for (final String key in environment.keys) {
       platformEnvironment[key] = environment[key];
     }
