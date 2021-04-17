@@ -29,7 +29,7 @@ class UnixPtyC implements PseudoTerminal {
     this.libPath,
     String executable,
     String workingDirectory,
-    List<String> arguments,
+    List<String> arguments = const [],
     Map<String, String> environment,
   }) {
     DynamicLibrary dynamicLibrary;
