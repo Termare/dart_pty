@@ -99,7 +99,7 @@ class UnixPtyC implements PseudoTerminal {
   Proc _createSubprocess(
     String executable, {
     String workingDirectory,
-    List<String> arguments,
+    List<String> arguments = const [],
     Map<String, String> environment,
   }) {
     final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
