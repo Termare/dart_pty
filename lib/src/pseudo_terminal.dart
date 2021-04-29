@@ -12,7 +12,7 @@ abstract class PseudoTerminal {
     int column = 80,
     String executable,
     String workingDirectory = '.',
-    List<String> arguments,
+    List<String> arguments = const [],
     Map<String, String> environment = const <String, String>{
       'TERM': 'xterm-256color',
     },
