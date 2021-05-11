@@ -1,0 +1,19 @@
+# Copyright (c) 2020, the Dart project authors. Please see the AUTHORS file
+# for details. All rights reserved. Use of this source code is governed by a
+# BSD-style license that can be found in the LICENSE file.
+
+name: simple_example
+
+environment:
+  sdk: '>=2.12.0 <3.0.0'
+
+dev_dependencies:
+  ffigen: ^2.4.2
+
+ffigen:
+  name: NativeLibrary
+  description: Bindings to `headers/example.h`.
+  output: 'generated_bindings.dart'
+  headers:
+    entry-points:
+      - '**.h'
