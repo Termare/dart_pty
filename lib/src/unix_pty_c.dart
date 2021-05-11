@@ -5,15 +5,10 @@ import 'dart:io';
 import 'package:dart_pty/src/proc.dart';
 import 'package:ffi/ffi.dart';
 
-import 'pseudo_terminal.dart';
-import 'unix/term.dart';
+import 'interface/pseudo_terminal_interface.dart';
+import 'unix/termare_native.dart';
 import 'unix_proc.dart';
 import 'utils/custom_utf.dart';
-
-typedef callback = Void Function(); //注意void 和Void的区别
-typedef testCallBack_func = Int32 Function(
-    Pointer<NativeFunction<callback>> func);
-typedef TestCallBack = int Function(Pointer<NativeFunction<callback>> func);
 
 // 这个需要配合c语言实现
 
@@ -24,41 +19,38 @@ void dartCallback(Pointer<Int8> int8) {
 
 class UnixPtyC implements PseudoTerminal {
   UnixPtyC({
-    this.rowLen,
-    this.columnLen,
+    required this.rowLen,
+    required this.columnLen,
     this.libPath,
-    String executable,
-    String workingDirectory,
+    String? executable,
+    String workingDirectory = '',
     List<String> arguments = const [],
-    Map<String, String> environment,
+    Map<String, String> environment = const {},
   }) {
     DynamicLibrary dynamicLibrary;
     if (libPath != null) {
-      dynamicLibrary = DynamicLibrary.open(libPath);
+      dynamicLibrary = DynamicLibrary.open(libPath!);
     } else {
       dynamicLibrary = DynamicLibrary.process();
     }
-    cTermare = CTermare(dynamicLibrary);
+    termareNative = TermareNative(dynamicLibrary);
     Pointer<NativeFunction<Callback>> callback =
         Pointer.fromFunction<Callback>(dartCallback);
-    cTermare.init_dart_print(callback);
-    pseudoTerminalId = cTermare.create_ptm(rowLen, columnLen);
+    termareNative.init_dart_print(callback);
+    pseudoTerminalId = termareNative.create_ptm(rowLen, columnLen);
     print('<- pseudoTerminalId : $pseudoTerminalId ->');
     _createSubprocess(
-      executable,
+      executable!,
       workingDirectory: workingDirectory,
       arguments: arguments,
       environment: environment,
     );
   }
   final NiUtf _niUtf = NiUtf();
-  final String libPath;
+  final String? libPath;
   final int rowLen;
   final int columnLen;
-  CTermare cTermare;
-
-  @override
-  int pseudoTerminalId;
+  late TermareNative termareNative;
 
   // void read() async {
   //   while (true) {
@@ -78,29 +70,29 @@ class UnixPtyC implements PseudoTerminal {
   //   }
   // }
   void write(String data) {
-    cTermare.write_to_fd(pseudoTerminalId, data.toNativeUtf8().cast());
+    termareNative.write_to_fd(pseudoTerminalId!, data.toNativeUtf8().cast());
   }
 
   @override
   List<int> readSync() {
     // print('读取');
     final Pointer<Uint8> resultPoint =
-        cTermare.get_output_from_fd(pseudoTerminalId).cast();
+        termareNative.get_output_from_fd(pseudoTerminalId!).cast();
     // 代表空指针
     if (resultPoint.address == 0) {
       // 释放内存
       // free(resultPoint);
       return [];
     }
-    final List<int> result = _niUtf.getCodeUnits(resultPoint);
+    final List<int> result = _niUtf.getCodeUnits(resultPoint)!;
     return result;
   }
 
   Proc _createSubprocess(
     String executable, {
-    String workingDirectory,
+    String workingDirectory = '.',
     List<String> arguments = const [],
-    Map<String, String> environment,
+    Map<String, String> environment = const {},
   }) {
     final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
       arguments.length + 1,
@@ -126,7 +118,7 @@ class UnixPtyC implements PseudoTerminal {
     );
     platformEnvironment['LANG'] = 'en_US.UTF-8';
     for (final String key in environment.keys) {
-      platformEnvironment[key] = environment[key];
+      platformEnvironment[key] = environment[key]!;
     }
 
     final Pointer<Pointer<Utf8>> envp = calloc<Pointer<Utf8>>(
@@ -150,19 +142,19 @@ class UnixPtyC implements PseudoTerminal {
     /// 初始化为0
     processId.value = 0;
 
-    cTermare.create_subprocess(
+    termareNative.create_subprocess(
       nullptr,
       executable.toNativeUtf8().cast(),
       workingDirectory.toNativeUtf8().cast(),
       argv.cast(),
       envp.cast(),
       processId,
-      pseudoTerminalId,
+      pseudoTerminalId!,
     );
     // Pointer<NativeFunction<Callback>> callback =
     //     Pointer.fromFunction<Callback>(dartCallback);
     // cTermare.post_thread(pseudoTerminalId, callback);
-    cTermare.setNonblock(pseudoTerminalId);
+    termareNative.setNonblock(pseudoTerminalId!);
 
     /// 释放动态申请的空间
     calloc.free(argv);
@@ -175,7 +167,7 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   void resize(int row, int column) {
-    cTermare.setPtyWindowSize(pseudoTerminalId, row, column);
+    termareNative.setPtyWindowSize(pseudoTerminalId!, row, column);
   }
 
   @override
@@ -196,4 +188,15 @@ class UnixPtyC implements PseudoTerminal {
     // free(devname);
     // return result;
   }
+
+  @override
+  int? pseudoTerminalId;
+
+  @override
+  void startPolling() {
+    // TODO: implement startPolling
+  }
+
+  @override
+  Stream<List<int>>? out;
 }
