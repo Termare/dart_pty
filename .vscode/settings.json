@@ -1,6 +1,18 @@
 {
     "files.associations": {
         "iostream": "cpp",
-        "__threading_support": "c"
+        "__threading_support": "c",
+        "fcntl.h": "c",
+        "dirent.h": "c",
+        "signal.h": "c",
+        "stdio.h": "c",
+        "string.h": "c",
+        "stdlib.h": "c",
+        "ioctl.h": "c",
+        "wait.h": "c",
+        "termios.h": "c",
+        "unistd.h": "c",
+        "_pid_t.h": "c",
+        "_types.h": "c"
     }
 }
