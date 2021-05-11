@@ -3,7 +3,7 @@ import 'dart:ffi';
 
 class NiUtf {
   List<int> unitsCache = <int>[]; //这个缓存是为了解决拿到的最后字符不完整
-  String listToStaring(List<int> units) {
+  String? listToStaring(List<int> units) {
     int len = units.length;
     units = unitsCache + units;
     // print('len=====$len');
@@ -66,13 +66,13 @@ class NiUtf {
     return null;
   }
 
-  List<int> getCodeUnits(Pointer<Uint8> str) {
+  List<int>? getCodeUnits(Pointer<Uint8> str) {
     if (str == null) {
       return null;
     }
     int len = 0;
     while (str.elementAt(++len).value != 0) {}
-    List<int> units = List<int>(len);
+    List<int> units = List.filled(len, 0);
     for (int i = 0; i < len; ++i) {
       units[i] = str.elementAt(i).value;
     }
@@ -136,13 +136,14 @@ class NiUtf {
     return null;
   }
 
-  String cStringtoString(Pointer<Uint8> str) {
+  String? cStringtoString(Pointer<Uint8> str) {
     if (str == null) {
       return null;
     }
     int len = 0;
     while (str.elementAt(++len).value != 0) {}
-    List<int> units = List<int>(len);
+    List<int> units = [];
+    units.length = len;
     for (int i = 0; i < len; ++i) {
       units[i] = str.elementAt(i).value;
     }
