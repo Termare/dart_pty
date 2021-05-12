@@ -1,4 +1,5 @@
 // 整个代码是c写的，dart负责调用
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 
@@ -27,12 +28,14 @@ class UnixPtyC implements PseudoTerminal {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
+    out = _out.stream.asBroadcastStream();
     DynamicLibrary dynamicLibrary;
     if (libPath != null) {
       dynamicLibrary = DynamicLibrary.open(libPath!);
     } else {
       dynamicLibrary = DynamicLibrary.process();
     }
+
     termareNative = TermareNative(dynamicLibrary);
     Pointer<NativeFunction<Callback>> callback =
         Pointer.fromFunction<Callback>(dartCallback);
@@ -94,6 +97,8 @@ class UnixPtyC implements PseudoTerminal {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
+    print('executable -> $executable');
+    print('arguments -> $arguments');
     final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
       arguments.length + 1,
     );
@@ -194,9 +199,33 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   void startPolling() {
-    // TODO: implement startPolling
+    _startPolling();
+  }
+
+  final _out = StreamController<List<int>>();
+  Future<void> _startPolling() async {
+    while (true) {
+      final List<int> list = readSync();
+      if (list.isNotEmpty) {
+        _out.sink.add(list);
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
   }
 
   @override
   Stream<List<int>>? out;
+  bool operator ==(dynamic other) {
+    // 判断是否是非
+    if (other is! PseudoTerminal) {
+      return false;
+    }
+    if (other is PseudoTerminal) {
+      return other.hashCode == hashCode;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode => pseudoTerminalId.hashCode;
 }
