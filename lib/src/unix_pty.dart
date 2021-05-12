@@ -10,9 +10,6 @@ import 'interface/pseudo_terminal_interface.dart';
 import 'native_header/generated_bindings.dart';
 import 'proc.dart';
 
-import 'unix/termare_native.dart';
-import 'utils/custom_utf.dart';
-
 // TODO
 // termare;
 
@@ -25,6 +22,8 @@ class UnixPty implements PseudoTerminal {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
+    out = _out.stream.asBroadcastStream();
+    // 这个函数实现的功能是完整的
     final DynamicLibrary dyLib = DynamicLibrary.process();
     nativeLibrary = NativeLibrary(dyLib);
     pseudoTerminalId = createPseudoTerminal();
@@ -92,7 +91,7 @@ class UnixPty implements PseudoTerminal {
     Pointer<Int8> devname = calloc<Int8>(1);
     // 获得pts路径
     devname = nativeLibrary.ptsname(pseudoTerminalId!).cast();
-    int pid = nativeLibrary.fork();
+    final int pid = nativeLibrary.fork();
     if (pid < 0) {
       print('fork faild');
     } else if (pid > 0) {
@@ -103,18 +102,15 @@ class UnixPty implements PseudoTerminal {
     } else {
       print('fork 子进程');
       // Clear signals which the Android java process may have blocked:
-      Pointer<Uint32> signals_to_unblock = calloc<Uint32>();
+      final Pointer<Uint32> signalsToUnblock = calloc<Uint32>();
       // sigset_t signals_to_unblock;
-      nativeLibrary.sigfillset(signals_to_unblock);
+      nativeLibrary.sigfillset(signalsToUnblock);
       nativeLibrary.sigprocmask(
         SIG_UNBLOCK,
-        signals_to_unblock,
+        signalsToUnblock,
         Pointer.fromAddress(0),
       );
-      // sigfillset(&signals_to_unblock);
-      // sigprocmask(SIG_UNBLOCK, &signals_to_unblock, 0);
-      // unistd.close(ptm);
-      // close(ptmfd);
+      nativeLibrary.close(pseudoTerminalId!);
       nativeLibrary.setsid();
       final int pts = nativeLibrary.open(devname, O_RDWR);
       if (pts < 0) {
@@ -123,37 +119,37 @@ class UnixPty implements PseudoTerminal {
       nativeLibrary.dup2(pts, 0);
       nativeLibrary.dup2(pts, 1);
       nativeLibrary.dup2(pts, 2);
+      // final Pointer<DIR> selfDir = nativeLibrary.opendir(
+      //   '/proc/self/fd'.toNativeUtf8().cast(),
+      // );
 
-      // Pointer<cdirent.DIR> self_dir =
-      //     dirent.opendir(Utf8.toUtf8('/proc/self/fd').cast<Int8>());
-      // if (self_dir.address != 0) {
-      //   int self_dir_fd = dirent.dirfd(self_dir);
-      //   Pointer<cdirent.dirent> entry = allocate();
-      //   (entry = dirent.readdir(self_dir));
-      //   int fd = stdlib.atoi(entry.ref.d_name);
-      //   if (fd > 2 && fd != self_dir_fd) unistd.close(fd);
+      // if (selfDir.address != 0) {
+      //   final int selfDirFd = nativeLibrary.dirfd(selfDir);
+      //   Pointer<dirent> entry = calloc();
+      //   entry = nativeLibrary.readdir(selfDir);
+      //   while (entry != nullptr) {
+      //     final int fd = nativeLibrary.atoi(entry.ref.d_name);
+      //     if (fd > 2 && fd != selfDirFd) {
+      //       nativeLibrary.close(fd);
+      //     }
+      //   }
 
-      //   dirent.closedir(self_dir);
+      //   nativeLibrary.closedir(selfDir);
       // }
-      Log.d('初始化环境变量');
-      print('test');
+      // Log.d('初始化环境变量');
+      // print('test');
       final Map<String, String> platformEnvironment = Map.from(
         Platform.environment,
       );
       for (final String key in environment.keys) {
         platformEnvironment[key] = environment[key]!;
       }
-      // environment['PATH'] = (Platform.isAndroid
-      //         ? '/data/data/com.nightmare/files/usr/bin:'
-      //         : FileSystemEntity.parentOf(Platform.resolvedExecutable) +
-      //             '/data/usr/bin:') +
-      // environment['PATH'];
+
       for (int i = 0; i < platformEnvironment.keys.length; i++) {
         final String env =
             '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}';
         nativeLibrary.putenv(env.toNativeUtf8().cast());
       }
-      nativeLibrary.chdir(workingDirectory.toNativeUtf8().cast());
 
       final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
         platformEnvironment.length + 1,
@@ -161,33 +157,21 @@ class UnixPty implements PseudoTerminal {
       for (int i = 0; i < arguments.length; i++) {
         argv[i] = arguments[i].toNativeUtf8();
       }
+      if (nativeLibrary.chdir(workingDirectory.toNativeUtf8().cast()) != 0) {
+        // nativeLibrary.perror('切换工作目录失败'.toNativeUtf8().cast());
+        // nativeLibrary.fflush(stderr);
+        Log.e('切换工作目录失败');
+        // stdout.flush();
+        // stderr.write('\x1b[31m切换工作目录失败\x1b[0m');
+        // stderr.flush();
+        // stdout.write('切换工作目录失败');
+        // stdout.flush();
+      }
       nativeLibrary.execvp(
         executable.toNativeUtf8().cast(),
         argv.cast(),
       );
-      // Pointer<Utf8> error_message;
-      // if (stdio.asprintf(error_message, "exec(\"%s\")", cmd) == -1)
-      //   error_message = "exec()";
-      // stdio.perror(error_message);
-      // _exit(1);
-      // if (chdir(cwd) != 0)
-      // {
-      //     char *error_message;
-      //     // No need to free asprintf()-allocated memory since doing execvp() or exit() below.
-      //     if (asprintf(&error_message, "chdir(\"%s\")", cwd) == -1)
-      //         error_message = "chdir()";
-      //     perror(error_message);
-      //     fflush(stderr);
-      // }
-      // //执行程序
-      // execvp(cmd, argv);
-
-      // // Show terminal output about failing exec() call:
-      // char *error_message;
-      // if (asprintf(&error_message, "exec(\"%s\")", cmd) == -1)
-      //     error_message = "exec()";
-      // perror(error_message);
-      // _exit(1);
+      Log.e('执行$executable命令失败');
     }
   }
 
@@ -203,26 +187,28 @@ class UnixPty implements PseudoTerminal {
   }
 
   final _out = StreamController<List<int>>();
+
   @override
-  Stream<List<int>> get out => _out.stream.asBroadcastStream();
+  Stream<List<int>>? out;
+
   @override
   List<int> readSync() {
-    // print('读取');
     //动态申请空间
-    final Pointer<Uint8> resultPoint = calloc<Uint8>(4097);
+
+    const int callocLength = 81920;
+    final Pointer<Uint8> resultPoint = calloc<Uint8>(callocLength + 1);
     //read函数返回从fd中读取到字符的长度
     //读取的内容存进str,4096表示此次读取4096个字节，如果只读到10个则length为10
     final int length = nativeLibrary.read(
       pseudoTerminalId!,
       resultPoint.cast(),
-      4096,
+      callocLength,
     );
     if (length == -1) {
-      // free(resultPoint);
+      calloc.free(resultPoint);
       return [];
     } else {
-      resultPoint.elementAt(4096).value = 0;
-
+      resultPoint.elementAt(callocLength).value = 0;
       return resultPoint.asTypedList(length);
     }
     // 代表空指针
@@ -291,7 +277,4 @@ class UnixPty implements PseudoTerminal {
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
   }
-
-  @override
-  set out(Stream<List<int>>? _out) {}
 }
