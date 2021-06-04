@@ -1,211 +1,357 @@
-// // TODOimport 'dart:convert';
-// import 'dart:ffi';
+import 'dart:async';
+import 'dart:ffi';
+import 'dart:io';
+import 'dart:typed_data';
 
-// import 'package:ffi/ffi.dart';
-// import 'package:win32/win32.dart' as win32;
+import 'package:ffi/ffi.dart';
+// import 'package:pty/src/util/win32_additional.dart';
+import 'package:win32/win32.dart' as win32;
 
-// import 'pseudo_terminal.dart';
-// import 'utils/custom_utf.dart';
-// import 'utils/globals.dart';
-// import 'win_proc.dart';
+import 'interface/pseudo_terminal_interface.dart';
 
-// class WinPty implements PseudoTerminal {
-//   WinPty({
-//     String executable,
-//   }) {
-//     final size = win32.COORD.allocate();
-//     size.X = 80;
-//     size.Y = 25;
+class _NamedPipe {
+  _NamedPipe({bool nowait = false}) {
+    final pipeName = r'\\.\pipe\dart-pty-pipe';
+    final pPipeName = pipeName.toNativeUtf16();
 
-//     final inputReadSide = allocate<IntPtr>();
-//     final outputWriteSide = allocate<IntPtr>();
-//     final outputReadSide = allocate<IntPtr>();
-//     final inputWriteSide = allocate<IntPtr>();
+    final waitMode = nowait ? win32.PIPE_NOWAIT : win32.PIPE_WAIT;
 
-//     final pipe1 = win32.CreatePipe(inputReadSide, inputWriteSide, nullptr, 0);
-//     final pipe2 = win32.CreatePipe(outputReadSide, outputWriteSide, nullptr, 0);
+    final namedPipe = win32.CreateNamedPipe(
+      pPipeName,
+      win32.PIPE_ACCESS_DUPLEX,
+      waitMode | win32.PIPE_READMODE_MESSAGE | win32.PIPE_TYPE_MESSAGE,
+      win32.PIPE_UNLIMITED_INSTANCES,
+      4096,
+      4096,
+      0,
+      nullptr,
+    );
 
-//     // print('pipe1 $pipe1');
-//     // print('pipe2 $pipe2');
+    if (namedPipe == win32.INVALID_HANDLE_VALUE) {
+      throw PtyException('CreateNamedPipe failed: ${win32.GetLastError()}');
+    }
 
-//     // print('inputReadSide   ${inputReadSide.value}.');
-//     // print('outputWriteSide ${outputWriteSide.value}.');
-//     // print('outputReadSide  ${outputReadSide.value}.');
-//     // print('inputWriteSide  ${inputWriteSide.value}.');
+    final namedPipeClient = win32.CreateFile(
+      pPipeName,
+      win32.GENERIC_READ | win32.GENERIC_WRITE,
+      0, // no sharing
+      nullptr, // default security attributes
+      win32.OPEN_EXISTING, // opens existing pipe ,
+      0, // default attributes
+      0, // no template file
+    );
+    calloc.free(pPipeName);
 
-//     _input = inputWriteSide.value;
-//     _output = outputReadSide.value;
+    if (namedPipeClient == win32.INVALID_HANDLE_VALUE) {
+      throw PtyException('CreateFile on named pipe failed');
+    }
 
-//     _hPC = allocate<IntPtr>();
+    readSide = namedPipe;
+    writeSide = namedPipeClient;
+  }
 
-//     final hr = win32.CreatePseudoConsole(size.addressOf.cast<IntPtr>().value,
-//         inputReadSide.value, outputWriteSide.value, 0, _hPC);
+  late final int readSide;
+  late final int writeSide;
+}
 
-//     // print('hr $hr');
-//     // print('hPC ${_hPC.value}');
+class WinPty implements PseudoTerminal {
+  WinPty({
+    required this.rowLen,
+    required this.columnLen,
+    String? executable,
+    List<String> arguments = const [],
+    String? workingDirectory,
+    Map<String, String> environment = const {},
+    bool blocking = false,
+  }) {
+    // create input pipe
+    out = _out.stream.asBroadcastStream();
+    final hReadPipe = calloc<IntPtr>();
+    final hWritePipe = calloc<IntPtr>();
+    final pipe2 = win32.CreatePipe(hReadPipe, hWritePipe, nullptr, 512);
+    if (pipe2 == win32.INVALID_HANDLE_VALUE) {
+      throw PtyException('CreatePipe failed: ${win32.GetLastError()}');
+    }
+    final inputWriteSide = hWritePipe.value;
+    final inputReadSide = hReadPipe.value;
 
-//     if (win32.FAILED(hr)) {
-//       // print('CreatePseudoConsole failed.');
-//       return;
-//     }
-//     _createSubprocess(executable);
-//   }
+    // create output pipe
+    final pipe1 = _NamedPipe(nowait: !blocking);
+    final outputReadSide = pipe1.readSide;
+    final outputWriteSide = pipe1.writeSide;
 
-//   int _input;
-//   int _output;
-//   Pointer<IntPtr> _hPC;
+    // final pipe2 = _NamedPipe(nowait: false);
+    // final inputWriteSide = pipe2.writeSide;
+    // final inputReadSide = pipe2.readSide;
 
-//   @override
-//   void resize(int width, int height) {
-//     final size = win32.COORD.allocate();
-//     size.X = width;
-//     size.Y = height;
-//     final hr = win32.ResizePseudoConsole(
-//         Pointer.fromAddress(_hPC.value), size.addressOf.cast<IntPtr>().value);
-//     print('ResizePseudoConsole $hr');
-//     if (win32.FAILED(hr)) {
-//       print('ResizePseudoConsole failed.');
-//       return;
-//     }
-//     free(size.addressOf);
-//   }
+    // create pty
+    final hPty = calloc<IntPtr>();
+    final size = calloc<win32.COORD>().ref;
+    size.X = 80;
+    size.Y = 25;
+    final hr = win32.CreatePseudoConsole(
+      size,
+      inputReadSide,
+      outputWriteSide,
+      0,
+      hPty,
+    );
 
-//   @override
-//   String readSync() {
-//     return rawRead(_output);
-//   }
+    if (win32.FAILED(hr)) {
+      throw PtyException('CreatePseudoConsole failed.');
+    }
 
-//   @override
-//   Future<String> read() {
-//     return executor.submitCallable(rawRead, _output);
-//   }
+    // Setup startup info
+    final si = calloc<win32.STARTUPINFOEX>();
+    si.ref.StartupInfo.cb = sizeOf<win32.STARTUPINFOEX>();
 
-//   @override
-//   void write(String data) {
-//     final cstr = Utf16.toUtf16(data);
-//     final written = allocate<Uint32>();
-//     // final nativeString = cstr.asTypedList(units.length + 1);
-//     // nativeString.setAll(0, units);
-//     // nativeString[units.length] = 0;
-//     // unistd.write(_ptm, cstr.cast(), units.length);
-//     final ret =
-//         win32.WriteFile(_input, cstr, data.codeUnits.length, written, nullptr);
-//     // print('WriteFile $ret');
-//     // print('written ${written.value}');
-//   }
+    // Explicitly set stdio of the child process to NULL. This is required for
+    // ConPTY to work properly.
+    si.ref.StartupInfo.hStdInput = nullptr.address;
+    si.ref.StartupInfo.hStdOutput = nullptr.address;
+    si.ref.StartupInfo.hStdError = nullptr.address;
+    si.ref.StartupInfo.dwFlags = win32.STARTF_USESTDHANDLES;
 
-//   WinProc _createSubprocess(
-//     String executable, {
-//     String workingDirectory = '.',
-//     List<String> arguments,
-//     Map<String, String> environment,
-//   }) {
-//     final si = win32.STARTUPINFOEX.allocate();
-//     // ZeroMemory(&si, sizeof(si));
-//     // sizeOf()
-//     si.cb = sizeOf<win32.STARTUPINFOEX>();
+    final bytesRequired = calloc<IntPtr>();
+    win32.InitializeProcThreadAttributeList(nullptr, 1, 0, bytesRequired);
+    si.ref.lpAttributeList = calloc<Int8>(bytesRequired.value);
 
-//     final bytesRequired = allocate<IntPtr>();
-//     win32.InitializeProcThreadAttributeList(nullptr, 1, 0, bytesRequired);
+    var ret = win32.InitializeProcThreadAttributeList(
+        si.ref.lpAttributeList, 1, 0, bytesRequired);
 
-//     print('bytesRequired ${bytesRequired.value}');
+    if (ret == win32.FALSE) {
+      throw PtyException('InitializeProcThreadAttributeList failed.');
+    }
 
-//     si.lpAttributeList = allocate<Int8>(count: bytesRequired.value);
-//     // win32.HeapAlloc(win32.GetProcessHeap(), 0, bytesRequired.value);
+    // use pty
+    ret = win32.UpdateProcThreadAttribute(
+      si.ref.lpAttributeList,
+      0,
+      win32.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
+      Pointer.fromAddress(hPty.value),
+      sizeOf<IntPtr>(),
+      nullptr,
+      nullptr,
+    );
 
-//     if (si.lpAttributeList == nullptr) {
-//       print('E_OUTOFMEMORY failed.');
-//       return null;
-//     }
+    if (ret == win32.FALSE) {
+      throw PtyException('UpdateProcThreadAttribute failed.');
+    }
 
-//     var ret = win32.InitializeProcThreadAttributeList(
-//         si.lpAttributeList, 1, 0, bytesRequired);
+    // build command line
+    final commandBuffer = StringBuffer();
+    commandBuffer.write(executable);
+    if (arguments.isNotEmpty) {
+      for (var argument in arguments) {
+        commandBuffer.write(' ');
+        commandBuffer.write(argument);
+      }
+    }
+    final pCommandLine = commandBuffer.toString().toNativeUtf16();
 
-//     if (ret == 0) {
-//       win32.HeapFree(win32.GetProcessHeap(), 0, si.lpAttributeList);
-//       final err = win32.HRESULT_FROM_WIN32(win32.GetLastError());
-//       print('GetLastError $err.');
-//       return null;
-//     }
+    // build current directory
+    Pointer<Utf16> pCurrentDirectory = nullptr;
+    if (workingDirectory != null) {
+      pCurrentDirectory = workingDirectory.toNativeUtf16();
+    }
 
-//     ret = win32.UpdateProcThreadAttribute(
-//       si.lpAttributeList,
-//       0,
-//       win32.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-//       Pointer.fromAddress(_hPC.value),
-//       sizeOf<IntPtr>(),
-//       nullptr,
-//       nullptr,
-//     );
+    // build environment
+    Pointer<Utf16> pEnvironment = nullptr;
+    if (environment != null && environment.isNotEmpty) {
+      final buffer = StringBuffer();
 
-//     print('UpdateProcThreadAttribute $ret.');
+      for (var env in environment.entries) {
+        buffer.write(env.key);
+        buffer.write('=');
+        buffer.write(env.value);
+        buffer.write('\u0000');
+      }
 
-//     // final childApplication = 'C:\\windows\\system32\\cmd.exe';
+      pEnvironment = buffer.toString().toNativeUtf16();
+    }
 
-//     final pi = win32.PROCESS_INFORMATION.allocate();
+    // start the process.
+    final pi = calloc<win32.PROCESS_INFORMATION>();
+    ret = win32.CreateProcess(
+      nullptr,
+      pCommandLine,
+      nullptr,
+      nullptr,
+      win32.FALSE,
+      win32.EXTENDED_STARTUPINFO_PRESENT | win32.CREATE_UNICODE_ENVIRONMENT,
+      // pass pEnvironment here causes crash
+      // TODO: fix this
+      // pEnvironment,
+      nullptr,
+      pCurrentDirectory,
+      si.cast(),
+      pi,
+    );
 
-//     ret = win32.CreateProcess(
-//       nullptr,
-//       Utf16.toUtf16(executable),
-//       nullptr,
-//       nullptr,
-//       win32.FALSE,
-//       win32.EXTENDED_STARTUPINFO_PRESENT,
-//       nullptr,
-//       nullptr,
-//       si.addressOf,
-//       pi.addressOf,
-//     );
+    calloc.free(pCommandLine);
 
-//     print('CreateProcess $ret.');
+    if (pCurrentDirectory != nullptr) {
+      calloc.free(pCurrentDirectory);
+    }
 
-//     if (ret == 0) {
-//       print('CreateProcess failed.');
-//       return null;
-//     }
+    if (pEnvironment != nullptr) {
+      calloc.free(pEnvironment);
+    }
 
-//     print('hProcess ${pi.hProcess}.');
+    if (ret == 0) {
+      throw PtyException('CreateProcess failed: ${win32.GetLastError()}');
+    }
+    _inputWriteSide = inputWriteSide;
+    _outputReadSide = outputReadSide;
+    _hPty = hPty.value;
+    _hProcess = pi.ref.hProcess;
+  }
 
-//     return WinProc(pi.hProcess, _hPC.value);
-//   }
+  final int rowLen;
+  final int columnLen;
+  late int _inputWriteSide;
+  late int _outputReadSide;
+  late int _hPty;
+  late int _hProcess;
 
-//   @override
-//   String getTtyPath() {
-//     return '';
-//     // // TODO: implement getTtyPath
-//     // throw UnimplementedError();
-//   }
+  static const _bufferSize = 4096;
+  final _buffer = calloc<Int8>(_bufferSize + 1).address;
+
+  @override
+  Future<List<int>> read() async {
+    return readSync();
+  }
+
+  @override
+  int? exitCodeNonBlocking() {
+    final exitCodePtr = calloc<Uint32>();
+    final ret = win32.GetExitCodeProcess(_hProcess, exitCodePtr);
+
+    final exitCode = exitCodePtr.value;
+    calloc.free(exitCodePtr);
+
+    const STILL_ACTIVE = 259;
+    if (ret == 0 || exitCode == STILL_ACTIVE) {
+      return null;
+    }
+
+    return exitCode;
+  }
+
+  @override
+  int exitCodeBlocking() {
+    const n = 1;
+    final pid = calloc<IntPtr>(n);
+    final infinite = 0xFFFFFFFF;
+    pid.elementAt(0).value = _hProcess;
+    win32.MsgWaitForMultipleObjects(n, pid, 1, infinite, win32.QS_ALLEVENTS);
+    return pid.elementAt(0).value;
+  }
+
+  @override
+  bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
+    final ret = win32.TerminateProcess(_hProcess, nullptr.address);
+    win32.ClosePseudoConsole(_hPty);
+    return ret != 0;
+  }
+
+  @override
+  void resize(int width, int height) {
+    final size = calloc<win32.COORD>();
+    size.ref.X = height;
+    size.ref.Y = width;
+    final hr = win32.ResizePseudoConsole(_hPty, size.ref);
+    if (win32.FAILED(hr)) {
+      throw PtyException('ResizePseudoConsole failed.');
+    }
+    calloc.free(size);
+  }
+
+  // @override
+  // int get pid {
+  //   return _hProcess;
+  // }
+
+  @override
+  void write(String data) {
+    final buffer = data.toNativeUtf8();
+    final written = calloc<Uint32>();
+    win32.WriteFile(_inputWriteSide, buffer, data.length, written, nullptr);
+    calloc.free(buffer);
+    calloc.free(written);
+  }
+
+  @override
+  Stream<List<int>>? out;
+
+  @override
+  int? pseudoTerminalId;
+
+  @override
+  String getTtyPath() {
+    // TODO: implement getTtyPath
+    throw UnimplementedError();
+  }
+
+  @override
+  List<int> readSync() {
+    final pReadlen = calloc<Uint32>();
+    final buffer = Pointer.fromAddress(_buffer);
+    final ret = win32.ReadFile(
+      _outputReadSide,
+      buffer,
+      _bufferSize,
+      pReadlen,
+      nullptr,
+    );
+
+    final readlen = pReadlen.value;
+    calloc.free(pReadlen);
+
+    if (ret == 0) {
+      return [];
+    }
+
+    if (readlen <= 0) {
+      return [];
+    } else {
+      return buffer.cast<Uint8>().asTypedList(readlen);
+    }
+  }
+
+  @override
+  void startPolling() {
+    _startPolling();
+  }
+
+  final _out = StreamController<List<int>>();
+  Future<void> _startPolling() async {
+    while (true) {
+      final List<int> list = readSync();
+      if (list.isNotEmpty) {
+        _out.sink.add(list);
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+  }
+}
+
+// void rawWait(int hProcess) {
+//   // final status = allocate<Int32>();
+//   // unistd.waitpid(pid, status, 0);
+//   final count = 1;
+//   final pids = calloc<IntPtr>(count);
+//   final infinite = 0xFFFFFFFF;
+//   pids.elementAt(0).value = hProcess;
+//   win32.MsgWaitForMultipleObjects(count, pids, 1, infinite, win32.QS_ALLEVENTS);
 // }
+class PtyException implements Exception {
+  PtyException(this.message);
 
-// String rawRead(int hFile) {
-//   // print('rawRead');
-//   const bufsize = 4096;
-//   final buffer = allocate<Int8>(count: bufsize + 1);
-//   final readlen = allocate<Uint32>();
+  final String message;
 
-//   win32.ReadFile(hFile, buffer, bufsize, readlen, nullptr);
-
-//   // print('ReadFile done');
-//   // print('readlen ${readlen.value}');
-
-//   if (readlen.value == -1) {
-//     return null;
-//   } else {
-//     buffer.elementAt(readlen.value).value = 0;
-//     // final result = Utf8.fromUtf8(buffer.cast());
-//     // free(readlen);
-//     // free(buffer);
-//     // return result; // print('读取');
-//     final Pointer<Uint8> resultPoint = buffer.cast();
-//     // 代表空指针
-//     if (resultPoint.address == 0) {
-//       // 释放内存
-//       // free(resultPoint);
-//       return '';
-//     }
-//     final String result = _niUtf.cStringtoString(resultPoint);
-//     return result;
-//   }
-// }
-
-// final NiUtf _niUtf = NiUtf();
+  @override
+  String toString() {
+    return message;
+  }
+}

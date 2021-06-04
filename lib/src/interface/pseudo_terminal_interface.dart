@@ -39,6 +39,15 @@ abstract class PseudoTerminal {
       libPath ??= 'dynamic_library/libterm.so';
     } else if (Platform.isAndroid) {
       libPath = 'libterm.so';
+    } else if (Platform.isWindows) {
+      return WinPty(
+        rowLen: row,
+        columnLen: column,
+        workingDirectory: workingDirectory,
+        executable: executable,
+        arguments: arguments,
+        environment: environment,
+      );
     }
 
     return UnixPtyC(

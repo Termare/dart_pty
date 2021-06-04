@@ -9,7 +9,7 @@ environment:
 
 dependencies:
   ffi: ^1.0.0
-  win32: ^2.0.0
+  win32: ^2.1.0
   executorservices: ^2.0.3
   signale:
     git: https://github.com/Nightmare-MY/signale

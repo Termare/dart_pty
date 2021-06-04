@@ -15,7 +15,7 @@ Future<void> main() async {
     libPath: './dynamic_library/libterm.dylib',
     workingDirectory: '/',
   );
-  print('pseudoTerminal -> ${pseudoTerminal.getTtyPath()}');
+  // print('pseudoTerminal -> ${pseudoTerminal.getTtyPath()}');
   await Future<void>.delayed(const Duration(milliseconds: 100));
 
   final String result = utf8.decode(await pseudoTerminal.read());
