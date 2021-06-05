@@ -5,8 +5,10 @@ import 'dart:io';
 
 import 'package:dart_pty/src/proc.dart';
 import 'package:ffi/ffi.dart';
+import 'package:signale/signale.dart';
 
 import 'interface/pseudo_terminal_interface.dart';
+import 'native_header/generated_bindings.dart';
 import 'unix/termare_native.dart';
 import 'unix_proc.dart';
 import 'utils/custom_utf.dart';
@@ -29,6 +31,8 @@ class UnixPtyC implements PseudoTerminal {
     Map<String, String> environment = const {},
   }) {
     out = _out.stream.asBroadcastStream();
+    final DynamicLibrary dyLib = DynamicLibrary.process();
+    nativeLibrary = NativeLibrary(dyLib);
     DynamicLibrary dynamicLibrary;
     if (libPath != null) {
       dynamicLibrary = DynamicLibrary.open(libPath!);
@@ -37,137 +41,187 @@ class UnixPtyC implements PseudoTerminal {
     }
 
     termareNative = TermareNative(dynamicLibrary);
-    Pointer<NativeFunction<Callback>> callback =
+    final Pointer<NativeFunction<Callback>> callback =
         Pointer.fromFunction<Callback>(dartCallback);
     termareNative.init_dart_print(callback);
-    pseudoTerminalId = termareNative.create_ptm(rowLen, columnLen);
-    print('<- pseudoTerminalId : $pseudoTerminalId ->');
+    pseudoTerminalId = createPseudoTerminal();
     _createSubprocess(
       executable!,
       workingDirectory: workingDirectory,
       arguments: arguments,
       environment: environment,
     );
+    termareNative.setNonblock(pseudoTerminalId!);
   }
-  final NiUtf _niUtf = NiUtf();
+  // 创建一个pty，返回它的ptm文本描述符，这个ptm在之后的读写，fork子进程还会用到
+  int createPseudoTerminal({bool verbose = true}) {
+    Log.d('Create Start');
+    final ptmxPath = '/dev/ptmx'.toNativeUtf8();
+    final int ptm = nativeLibrary.open(
+      ptmxPath.cast<Int8>(),
+      O_RDWR | O_CLOEXEC,
+    );
+    if (nativeLibrary.grantpt(ptm) != 0 || nativeLibrary.unlockpt(ptm) != 0) {
+      // 说明二者有一个失败
+      print('Cannot grantpt()/unlockpt()/ptsname_r() on /dev/ptmx');
+      return -1;
+    }
+    final Pointer<termios> tios = calloc<termios>();
+    // addressOf 可以获取指针
+    nativeLibrary.tcgetattr(ptm, tios);
+    tios.ref.c_iflag |= IUTF8;
+    tios.ref.c_iflag &= ~(IXON | IXOFF);
+    nativeLibrary.tcsetattr(ptm, TCSANOW, tios);
+    // free(tios);
+    // =========== 设置终端大小 =============
+    final Pointer<winsize> size = calloc<winsize>();
+    size.ref.ws_row = rowLen;
+    size.ref.ws_col = columnLen;
+    nativeLibrary.ioctl(
+      ptm,
+      TIOCSWINSZ,
+      size,
+    );
+    calloc.free(size);
+    // free(ptmxPath);
+
+    Log.d('Create End');
+
+    Log.d('<- pseudoTerminalId : $pseudoTerminalId ->');
+    return ptm;
+    // nativeLibrary.grantpt()
+  }
+
+  late NativeLibrary nativeLibrary;
   final String? libPath;
   final int rowLen;
   final int columnLen;
   late TermareNative termareNative;
 
-  // void read() async {
-  //   while (true) {
-  //     await Future.delayed(Duration(milliseconds: 300));
-  //     print('读取');
-  //     final Pointer<Uint8> resultPoint =
-  //         cTermare.get_output_from_fd(pseudoTerminalId).cast();
-
-  //     // 代表空指针
-  //     if (resultPoint.address == 0) {
-  //       // 释放内存
-  //       // free(resultPoint);
-  //       continue;
-  //     }
-  //     String result = _niUtf.cStringtoString(resultPoint);
-  //     print('result->$result');
-  //   }
-  // }
+  @override
   void write(String data) {
-    termareNative.write_to_fd(pseudoTerminalId!, data.toNativeUtf8().cast());
+    final Pointer<Utf8> utf8Pointer = data.toNativeUtf8();
+    nativeLibrary.write(
+      pseudoTerminalId!,
+      utf8Pointer.cast(),
+      nativeLibrary.strlen(utf8Pointer.cast()),
+    );
   }
 
   @override
   List<int> readSync() {
-    // print('读取');
-    final Pointer<Uint8> resultPoint =
-        termareNative.get_output_from_fd(pseudoTerminalId!).cast();
-    // 代表空指针
-    if (resultPoint.address == 0) {
-      // 释放内存
-      // free(resultPoint);
+    //动态申请空间
+
+    const int callocLength = 81920;
+    final Pointer<Uint8> resultPoint = calloc<Uint8>(callocLength + 1);
+    //read函数返回从fd中读取到字符的长度
+    //读取的内容存进str,4096表示此次读取4096个字节，如果只读到10个则length为10
+    final int length = nativeLibrary.read(
+      pseudoTerminalId!,
+      resultPoint.cast(),
+      callocLength,
+    );
+    if (length == -1) {
+      calloc.free(resultPoint);
       return [];
+    } else {
+      resultPoint.elementAt(callocLength).value = 0;
+      return resultPoint.asTypedList(length);
     }
-    final List<int> result = _niUtf.getCodeUnits(resultPoint)!;
-    return result;
+    // 代表空指针
   }
 
-  Proc _createSubprocess(
+  Proc? _createSubprocess(
     String executable, {
     String workingDirectory = '.',
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
-    print('executable -> $executable');
-    print('arguments -> $arguments');
-    final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
-      arguments.length + 1,
-    );
-    for (int i = 0; i < arguments.length; i++) {
-      argv[i] = arguments[i].toNativeUtf8();
+    Pointer<Int8> devname = calloc<Int8>(1);
+    // 获得pts路径
+    devname = nativeLibrary.ptsname(pseudoTerminalId!).cast();
+    final int pid = nativeLibrary.fork();
+    if (pid < 0) {
+      print('fork faild');
+    } else if (pid > 0) {
+      print('fork 主进程');
+
+      // 这里会返回子进程的pid
+      return UnixProc(pid);
+    } else {
+      print('fork 子进程');
+      // Clear signals which the Android java process may have blocked:
+      final Pointer<Uint32> signalsToUnblock = calloc<Uint32>();
+      // sigset_t signals_to_unblock;
+      nativeLibrary.sigfillset(signalsToUnblock);
+      nativeLibrary.sigprocmask(
+        SIG_UNBLOCK,
+        signalsToUnblock,
+        Pointer.fromAddress(0),
+      );
+      nativeLibrary.close(pseudoTerminalId!);
+      nativeLibrary.setsid();
+      final int pts = nativeLibrary.open(devname, O_RDWR);
+      if (pts < 0) {
+        return null;
+      }
+      nativeLibrary.dup2(pts, 0);
+      nativeLibrary.dup2(pts, 1);
+      nativeLibrary.dup2(pts, 2);
+      // final Pointer<DIR> selfDir = nativeLibrary.opendir(
+      //   '/proc/self/fd'.toNativeUtf8().cast(),
+      // );
+
+      // if (selfDir.address != 0) {
+      //   final int selfDirFd = nativeLibrary.dirfd(selfDir);
+      //   Pointer<dirent> entry = calloc();
+      //   entry = nativeLibrary.readdir(selfDir);
+      //   while (entry != nullptr) {
+      //     final int fd = nativeLibrary.atoi(entry.ref.d_name);
+      //     if (fd > 2 && fd != selfDirFd) {
+      //       nativeLibrary.close(fd);
+      //     }
+      //   }
+
+      //   nativeLibrary.closedir(selfDir);
+      // }
+      // Log.d('初始化环境变量');
+      // print('test');
+      final Map<String, String> platformEnvironment = Map.from(
+        Platform.environment,
+      );
+      for (final String key in environment.keys) {
+        platformEnvironment[key] = environment[key]!;
+      }
+
+      for (int i = 0; i < platformEnvironment.keys.length; i++) {
+        final String env =
+            '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}';
+        nativeLibrary.putenv(env.toNativeUtf8().cast());
+      }
+
+      final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
+        platformEnvironment.length + 1,
+      );
+      for (int i = 0; i < arguments.length; i++) {
+        argv[i] = arguments[i].toNativeUtf8();
+      }
+      if (nativeLibrary.chdir(workingDirectory.toNativeUtf8().cast()) != 0) {
+        // nativeLibrary.perror('切换工作目录失败'.toNativeUtf8().cast());
+        // nativeLibrary.fflush(stderr);
+        Log.e('切换工作目录失败');
+        // stdout.flush();
+        // stderr.write('\x1b[31m切换工作目录失败\x1b[0m');
+        // stderr.flush();
+        // stdout.write('切换工作目录失败');
+        // stdout.flush();
+      }
+      nativeLibrary.execvp(
+        executable.toNativeUtf8().cast(),
+        argv.cast(),
+      );
+      Log.e('执行$executable命令失败');
     }
-    argv[arguments.length] = nullptr;
-
-    ///    将双重指针的第一个一级指针赋值为空
-    ///    等价于
-    ///    char **p = (char **)malloc(1);
-    ///    p[1] = 0;    p[1] = NULL;    *p = 0;   *p = NULL;
-    ///    上一行的4个语句都是等价的
-    ///    将第一个指针赋值为空的原因是C语言端遍历这个argv的方法是通过判断当前指针是否为空作为循环的退出条件
-    // argv[0] = nullptr;
-
-    /// 定义一个二级指针，用来保存当前终端的环境信息，这个二级指针对应C语言中的二维数组
-
-    ///
-    final Map<String, String> platformEnvironment = Map.from(
-      Platform.environment,
-    );
-    platformEnvironment['LANG'] = 'en_US.UTF-8';
-    for (final String key in environment.keys) {
-      platformEnvironment[key] = environment[key]!;
-    }
-
-    final Pointer<Pointer<Utf8>> envp = calloc<Pointer<Utf8>>(
-      platformEnvironment.length + 1,
-    );
-
-    /// 将Map内容拷贝到二维数组
-    for (int i = 0; i < platformEnvironment.keys.length; i++) {
-      envp[i] =
-          '${platformEnvironment.keys.elementAt(i)}=${platformEnvironment[platformEnvironment.keys.elementAt(i)]}'
-              .toNativeUtf8();
-    }
-
-    ///  末元素赋值空指针
-    envp[platformEnvironment.length] = nullptr;
-
-    /// 定义一个指向int的指针
-    /// 是C语言中常用的方法，指针为双向传递，可以由调用的函数来直接更改这个值
-    final Pointer<Int32> processId = calloc<Int32>(1);
-
-    /// 初始化为0
-    processId.value = 0;
-
-    termareNative.create_subprocess(
-      nullptr,
-      executable.toNativeUtf8().cast(),
-      workingDirectory.toNativeUtf8().cast(),
-      argv.cast(),
-      envp.cast(),
-      processId,
-      pseudoTerminalId!,
-    );
-    // Pointer<NativeFunction<Callback>> callback =
-    //     Pointer.fromFunction<Callback>(dartCallback);
-    // cTermare.post_thread(pseudoTerminalId, callback);
-    termareNative.setNonblock(pseudoTerminalId!);
-
-    /// 释放动态申请的空间
-    calloc.free(argv);
-    calloc.free(envp);
-    // malloc.free(processId);
-    print('<- processId.value : ${processId.value} ->');
-    // read();
-    return UnixProc(pid);
   }
 
   @override
@@ -182,27 +236,25 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   String getTtyPath() {
-    throw UnimplementedError();
-    // CStdlib cstdlib;
-    // DynamicLibrary dynamicLibrary = DynamicLibrary.process();
-    // cstdlib = CStdlib(dynamicLibrary);
-    // Pointer<Int8> devname = allocate<Int8>();
-    // // 获得pts路径
-    // devname = cstdlib.ptsname(pseudoTerminalId).cast();
-    // String result = Utf8.fromUtf8(devname.cast());
-    // free(devname);
-    // return result;
+    Pointer<Int8> devname = calloc<Int8>();
+    // 获得pts路径
+    devname = nativeLibrary.ptsname(pseudoTerminalId!);
+    final String result = devname.cast<Utf8>().toDartString();
+    // 下面代码引发crash
+    // calloc.free(devname);
+    return result;
   }
 
   @override
   int? pseudoTerminalId;
+
+  final _out = StreamController<List<int>>();
 
   @override
   void startPolling() {
     _startPolling();
   }
 
-  final _out = StreamController<List<int>>();
   Future<void> _startPolling() async {
     while (true) {
       final List<int> list = readSync();
@@ -215,6 +267,7 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   Stream<List<int>>? out;
+  @override
   bool operator ==(dynamic other) {
     // 判断是否是非
     if (other is! PseudoTerminal) {

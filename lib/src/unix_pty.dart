@@ -237,16 +237,6 @@ class UnixPty implements PseudoTerminal {
 
   @override
   void resize(int row, int column) {
-    // String libPath = Platform.resolvedExecutable.replaceAll(
-    //   RegExp('\\.app/.*'),
-    //   r'.app/',
-    // );
-    // libPath += 'Contents/Frameworks/App.framework/';
-    // libPath += 'Resources/flutter_assets/assets/lib/libterm.dylib';
-    // DynamicLibrary dynamicLibrary = DynamicLibrary.open(libPath);
-    // TermareNative termareNative = TermareNative(dynamicLibrary);
-    // termareNative.setPtyWindowSize(pseudoTerminalId!, row, column);
-    // return;
     print('$this resize');
     final Pointer<winsize> size = malloc<winsize>();
     size.ref.ws_row = row;
