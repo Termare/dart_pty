@@ -224,6 +224,24 @@ char *get_output_from_fd(int fd)
     }
 }
 
+int waitFor(int pid)
+{
+    int status;
+    waitpid(pid, &status, 0);
+    if (WIFEXITED(status))
+    {
+        return WEXITSTATUS(status);
+    }
+    else if (WIFSIGNALED(status))
+    {
+        return -WTERMSIG(status);
+    }
+    else
+    {
+        // Should never happen - waitpid(2) says "One of the first three macros will evaluate to a non-zero (true) value".
+        return 0;
+    }
+}
 void setPtyWindowSize(int fd, int rows, int cols)
 {
     struct winsize sz = {.ws_row = (unsigned short)rows, .ws_col = (unsigned short)cols};

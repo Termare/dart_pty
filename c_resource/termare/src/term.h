@@ -17,3 +17,4 @@ typedef void (*Callback)(char *p);
 void setPtyWindowSize(int fd, int rows, int cols);
 void init_dart_print(Callback callback);
 void post_thread(int ptmfd, Callback callback);
+int waitFor(int pid);
