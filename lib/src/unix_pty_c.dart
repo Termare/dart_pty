@@ -1,12 +1,17 @@
 // 整个代码是c写的，dart负责调用
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
+import 'package:dart_pty/dart_pty.dart';
 import 'package:dart_pty/src/proc.dart';
 import 'package:ffi/ffi.dart';
 import 'package:signale/signale.dart';
 
+import 'foundation/file_descriptor.dart';
 import 'interface/pseudo_terminal_interface.dart';
 import 'native_header/generated_bindings.dart';
 import 'unix/termare_native.dart';
@@ -30,9 +35,12 @@ class UnixPtyC implements PseudoTerminal {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
+    release = false &
+        const bool.fromEnvironment(
+          'dart.vm.product',
+          defaultValue: false,
+        );
     out = _out.stream.asBroadcastStream();
-    final DynamicLibrary dyLib = DynamicLibrary.process();
-    nativeLibrary = NativeLibrary(dyLib);
     DynamicLibrary dynamicLibrary;
     if (libPath != null) {
       dynamicLibrary = DynamicLibrary.open(libPath!);
@@ -45,13 +53,25 @@ class UnixPtyC implements PseudoTerminal {
         Pointer.fromFunction<Callback>(dartCallback);
     termareNative.init_dart_print(callback);
     pseudoTerminalId = createPseudoTerminal();
+    fd = FileDescriptor(pseudoTerminalId, nativeLibrary);
     _createSubprocess(
       executable!,
       workingDirectory: workingDirectory,
       arguments: arguments,
       environment: environment,
     );
-    termareNative.setNonblock(pseudoTerminalId!);
+    if (!release) {
+      int flag = -1;
+      flag = nativeLibrary.fcntl(fd.fd, F_GETFL, 0); //获取当前flag
+      Log.d('>>>>>>>> 当前flag = $flag');
+      flag |= O_NONBLOCK; //设置新falg
+      Log.d('>>>>>>>> 设置新flag = $flag');
+      // nativeLibrary.fcntl(fd.fd, F_SETFL, flag); //更新flag
+      termareNative.setNonblock(pseudoTerminalId);
+      flag = nativeLibrary.fcntl(fd.fd, F_GETFL, 0); //获取当前flag
+      Log.d('>>>>>>>> 再次获取到的flag = $flag');
+    }
+    Log.d('<- pseudoTerminalId : $pseudoTerminalId ->');
   }
   // 创建一个pty，返回它的ptm文本描述符，这个ptm在之后的读写，fork子进程还会用到
   int createPseudoTerminal({bool verbose = true}) {
@@ -87,49 +107,30 @@ class UnixPtyC implements PseudoTerminal {
 
     Log.d('Create End');
 
-    Log.d('<- pseudoTerminalId : $pseudoTerminalId ->');
     return ptm;
     // nativeLibrary.grantpt()
   }
 
-  late NativeLibrary nativeLibrary;
+  late FileDescriptor fd;
+  late bool release;
   final String? libPath;
   final int rowLen;
   final int columnLen;
   late TermareNative termareNative;
+  static const bufferLimit = 81920;
 
   @override
   void write(String data) {
     final Pointer<Utf8> utf8Pointer = data.toNativeUtf8();
     nativeLibrary.write(
-      pseudoTerminalId!,
+      pseudoTerminalId,
       utf8Pointer.cast(),
       nativeLibrary.strlen(utf8Pointer.cast()),
     );
   }
 
   @override
-  List<int> readSync() {
-    //动态申请空间
-
-    const int callocLength = 81920;
-    final Pointer<Uint8> resultPoint = calloc<Uint8>(callocLength + 1);
-    //read函数返回从fd中读取到字符的长度
-    //读取的内容存进str,4096表示此次读取4096个字节，如果只读到10个则length为10
-    final int length = nativeLibrary.read(
-      pseudoTerminalId!,
-      resultPoint.cast(),
-      callocLength,
-    );
-    if (length == -1) {
-      calloc.free(resultPoint);
-      return [];
-    } else {
-      resultPoint.elementAt(callocLength).value = 0;
-      return resultPoint.asTypedList(length);
-    }
-    // 代表空指针
-  }
+  Uint8List? readSync() => fd.read(81920);
 
   Proc? _createSubprocess(
     String executable, {
@@ -139,7 +140,7 @@ class UnixPtyC implements PseudoTerminal {
   }) {
     Pointer<Int8> devname = calloc<Int8>(1);
     // 获得pts路径
-    devname = nativeLibrary.ptsname(pseudoTerminalId!).cast();
+    devname = nativeLibrary.ptsname(pseudoTerminalId).cast();
     final int pid = nativeLibrary.fork();
     if (pid < 0) {
       print('fork faild');
@@ -159,7 +160,7 @@ class UnixPtyC implements PseudoTerminal {
         signalsToUnblock,
         Pointer.fromAddress(0),
       );
-      nativeLibrary.close(pseudoTerminalId!);
+      nativeLibrary.close(pseudoTerminalId);
       nativeLibrary.setsid();
       final int pts = nativeLibrary.open(devname, O_RDWR);
       if (pts < 0) {
@@ -207,14 +208,7 @@ class UnixPtyC implements PseudoTerminal {
         argv[i] = arguments[i].toNativeUtf8();
       }
       if (nativeLibrary.chdir(workingDirectory.toNativeUtf8().cast()) != 0) {
-        // nativeLibrary.perror('切换工作目录失败'.toNativeUtf8().cast());
-        // nativeLibrary.fflush(stderr);
         Log.e('切换工作目录失败');
-        // stdout.flush();
-        // stderr.write('\x1b[31m切换工作目录失败\x1b[0m');
-        // stderr.flush();
-        // stdout.write('切换工作目录失败');
-        // stdout.flush();
       }
       nativeLibrary.execvp(
         executable.toNativeUtf8().cast(),
@@ -226,11 +220,11 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   void resize(int row, int column) {
-    termareNative.setPtyWindowSize(pseudoTerminalId!, row, column);
+    termareNative.setPtyWindowSize(pseudoTerminalId, row, column);
   }
 
   @override
-  Future<List<int>> read() async {
+  Uint8List? read() {
     return readSync();
   }
 
@@ -238,7 +232,7 @@ class UnixPtyC implements PseudoTerminal {
   String getTtyPath() {
     Pointer<Int8> devname = calloc<Int8>();
     // 获得pts路径
-    devname = nativeLibrary.ptsname(pseudoTerminalId!);
+    devname = nativeLibrary.ptsname(pseudoTerminalId);
     final String result = devname.cast<Utf8>().toDartString();
     // 下面代码引发crash
     // calloc.free(devname);
@@ -246,9 +240,9 @@ class UnixPtyC implements PseudoTerminal {
   }
 
   @override
-  int? pseudoTerminalId;
+  late int pseudoTerminalId;
 
-  final _out = StreamController<List<int>>();
+  final _out = StreamController<String>();
 
   @override
   void startPolling() {
@@ -256,17 +250,37 @@ class UnixPtyC implements PseudoTerminal {
   }
 
   Future<void> _startPolling() async {
+    if (release) {
+      final ReceivePort receivePort = ReceivePort();
+      SendPort? sendPort;
+      receivePort.listen((dynamic msg) {
+        if (sendPort == null) {
+          sendPort = msg as SendPort;
+        } else {
+          // Log.e('msg -> $msg');
+          _out.sink.add(msg as String);
+        }
+      });
+      Isolate.spawn<_IsolateArgs>(
+        isolateRead,
+        _IsolateArgs<int>(receivePort.sendPort, pseudoTerminalId),
+      );
+      return;
+    }
+    final input = StreamController<List<int>>(sync: true);
+    input.stream.transform(utf8.decoder).listen(_out.sink.add);
     while (true) {
-      final List<int> list = readSync();
-      if (list.isNotEmpty) {
-        _out.sink.add(list);
+      // Log.w('轮训...');
+      final Uint8List? list = readSync();
+      if (list != null) {
+        input.sink.add(list);
       }
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
   }
 
   @override
-  Stream<List<int>>? out;
+  Stream<String>? out;
   @override
   bool operator ==(dynamic other) {
     // 判断是否是非
@@ -281,4 +295,35 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   int get hashCode => pseudoTerminalId.hashCode;
+}
+
+class _IsolateArgs<T> {
+  _IsolateArgs(
+    this.sendPort,
+    this.arg,
+  );
+
+  final SendPort sendPort;
+  final T arg;
+}
+
+// 新isolate的入口函数
+Future<void> isolateRead(_IsolateArgs args) async {
+  // 实例化一个ReceivePort 以接收消息
+  final ReceivePort port = ReceivePort();
+  final FileDescriptor fd = FileDescriptor(args.arg as int, nativeLibrary);
+
+  final input = StreamController<List<int>>(sync: true);
+
+  input.stream.transform(utf8.decoder).listen(args.sendPort.send);
+  // 把它的sendPort发送给宿主isolate，以便宿主可以给它发送消息
+  args.sendPort.send(port.sendPort);
+  while (true) {
+    final Uint8List? result = fd.read(81920);
+    // Log.w('读取...$result');
+    if (result != null) {
+      input.sink.add(result);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }

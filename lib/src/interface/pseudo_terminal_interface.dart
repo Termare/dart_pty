@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import '../proc.dart';
 import '../unix_pty.dart';
@@ -40,20 +41,20 @@ abstract class PseudoTerminal {
     } else if (Platform.isAndroid) {
       libPath = 'libterm.so';
     } else if (Platform.isWindows) {
-      return WinPty(
-        rowLen: row,
-        columnLen: column,
-        workingDirectory: workingDirectory,
-        executable: executable,
-        arguments: arguments,
-        environment: environment,
-      );
+      // return WinPty(
+      //   rowLen: row,
+      //   columnLen: column,
+      //   workingDirectory: workingDirectory,
+      //   executable: executable,
+      //   arguments: arguments,
+      //   environment: environment,
+      // );
     }
 
-    return UnixPtyC(
+    return UnixPty(
       rowLen: row,
       columnLen: column,
-      libPath: libPath,
+      // libPath: libPath,
       workingDirectory: workingDirectory,
       executable: executable,
       arguments: arguments,
@@ -61,12 +62,12 @@ abstract class PseudoTerminal {
     );
   }
 
-  int? pseudoTerminalId;
-  Stream<List<int>>? out;
+  late int pseudoTerminalId;
+  Stream<String>? out;
 
-  List<int> readSync();
+  Uint8List? readSync();
 
-  Future<List<int>> read();
+  Uint8List? read();
 
   void write(String data);
 

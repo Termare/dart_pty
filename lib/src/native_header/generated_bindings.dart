@@ -9569,7 +9569,7 @@ const int FREAD = 1;
 
 const int FWRITE = 2;
 
-const int O_NONBLOCK = 4;
+const int O_NONBLOCK = 04000;
 
 const int O_APPEND = 8;
 
