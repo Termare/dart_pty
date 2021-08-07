@@ -51,10 +51,10 @@ abstract class PseudoTerminal {
       // );
     }
 
-    return UnixPty(
+    return UnixPtyC(
       rowLen: row,
       columnLen: column,
-      // libPath: libPath,
+      libPath: libPath,
       workingDirectory: workingDirectory,
       executable: executable,
       arguments: arguments,
