@@ -181,7 +181,7 @@ class UnixPty implements PseudoTerminal {
     int flag = -1;
     flag = nativeLibrary.fcntl(fd, F_GETFL, 0); //获取当前flag
     Log.d('> 当前flag = $flag');
-    flag |= O_NONBLOCK; //设置新falg
+    flag |= Platform.isAndroid ? O_NONBLOCK_ANDROID : O_NONBLOCK; //设置新falg
     Log.d('> 设置新flag = $flag');
     nativeLibrary.fcntl(fd, F_SETFL, flag); //更新flag
     flag = nativeLibrary.fcntl(fd, F_GETFL, 0); //获取当前flag
@@ -253,5 +253,10 @@ class UnixPty implements PseudoTerminal {
       }
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
+  }
+
+  @override
+  void schedulingRead() {
+    // TODO: implement schedulingRead
   }
 }

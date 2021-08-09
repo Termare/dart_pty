@@ -249,13 +249,15 @@ class UnixPtyC implements PseudoTerminal {
     _startPolling();
   }
 
+  SendPort? sendPort;
   Future<void> _startPolling() async {
     if (release) {
       final ReceivePort receivePort = ReceivePort();
-      SendPort? sendPort;
       receivePort.listen((dynamic msg) {
         if (sendPort == null) {
           sendPort = msg as SendPort;
+          // 先让子 isolate 先读一次数据
+          sendPort?.send(true);
         } else {
           // Log.e('msg -> $msg');
           _out.sink.add(msg as String);
@@ -295,6 +297,11 @@ class UnixPtyC implements PseudoTerminal {
 
   @override
   int get hashCode => pseudoTerminalId.hashCode;
+
+  @override
+  void schedulingRead() {
+    sendPort?.send(true);
+  }
 }
 
 class _IsolateArgs<T> {
@@ -310,20 +317,20 @@ class _IsolateArgs<T> {
 // 新isolate的入口函数
 Future<void> isolateRead(_IsolateArgs args) async {
   // 实例化一个ReceivePort 以接收消息
-  final ReceivePort port = ReceivePort();
+  final ReceivePort receivePort = ReceivePort();
+  args.sendPort.send(receivePort.sendPort);
   final FileDescriptor fd = FileDescriptor(args.arg as int, nativeLibrary);
 
   final input = StreamController<List<int>>(sync: true);
 
   input.stream.transform(utf8.decoder).listen(args.sendPort.send);
   // 把它的sendPort发送给宿主isolate，以便宿主可以给它发送消息
-  args.sendPort.send(port.sendPort);
-  while (true) {
+
+  await for (final dynamic _ in receivePort) {
     final Uint8List? result = fd.read(81920);
     // Log.w('读取...$result');
     if (result != null) {
       input.sink.add(result);
     }
-    await Future<void>.delayed(const Duration(milliseconds: 10));
   }
 }

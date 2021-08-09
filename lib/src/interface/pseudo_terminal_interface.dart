@@ -84,4 +84,5 @@ abstract class PseudoTerminal {
   // void close();
 
   void startPolling();
+  void schedulingRead();
 }
