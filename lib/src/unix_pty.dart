@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:dart_pty/dart_pty.dart';
@@ -26,11 +27,19 @@ class UnixPty implements PseudoTerminal {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
+    release = const bool.fromEnvironment(
+      'dart.vm.product',
+      defaultValue: false,
+    );
     out = _out.stream.asBroadcastStream();
     // 这个函数实现的功能是完整的
     pseudoTerminalId = createPseudoTerminal();
     fd = FileDescriptor(pseudoTerminalId, nativeLibrary);
-    setNonblock(pseudoTerminalId);
+
+    if (!release) {
+      fd.setNonblock(pseudoTerminalId);
+    }
+
     _createSubprocess(
       executable!,
       workingDirectory: workingDirectory,
@@ -76,6 +85,7 @@ class UnixPty implements PseudoTerminal {
     // nativeLibrary.grantpt()
   }
 
+  late bool release;
   late FileDescriptor fd;
   // final NiUtf _niUtf = NiUtf();
   final int rowLen;
@@ -177,17 +187,6 @@ class UnixPty implements PseudoTerminal {
     }
   }
 
-  void setNonblock(int fd, {bool verbose = true}) {
-    int flag = -1;
-    flag = nativeLibrary.fcntl(fd, F_GETFL, 0); //获取当前flag
-    Log.d('> 当前flag = $flag');
-    flag |= Platform.isAndroid ? O_NONBLOCK_ANDROID : O_NONBLOCK; //设置新falg
-    Log.d('> 设置新flag = $flag');
-    nativeLibrary.fcntl(fd, F_SETFL, flag); //更新flag
-    flag = nativeLibrary.fcntl(fd, F_GETFL, 0); //获取当前flag
-    Log.d('> 再次获取到的flag = $flag');
-  }
-
   final _out = StreamController<String>();
 
   @override
@@ -222,12 +221,12 @@ class UnixPty implements PseudoTerminal {
   @override
   void resize(int row, int column) {
     print('$this resize');
-    final Pointer<winsize> size = malloc<winsize>();
+    final Pointer<winsize> size = calloc<winsize>();
     size.ref.ws_row = row;
     size.ref.ws_col = column;
     nativeLibrary.ioctl(
       pseudoTerminalId,
-      TIOCSWINSZ,
+      Platform.isAndroid ? TIOCSWINSZ_ANDROID : TIOCSWINSZ,
       size,
     );
   }
@@ -242,7 +241,26 @@ class UnixPty implements PseudoTerminal {
     _startPolling();
   }
 
+  SendPort? sendPort;
   Future<void> _startPolling() async {
+    if (release) {
+      final ReceivePort receivePort = ReceivePort();
+      receivePort.listen((dynamic msg) {
+        if (sendPort == null) {
+          sendPort = msg as SendPort;
+          // 先让子 isolate 先读一次数据
+          sendPort?.send(true);
+        } else {
+          // Log.e('msg -> $msg');
+          _out.sink.add(msg as String);
+        }
+      });
+      Isolate.spawn<_IsolateArgs>(
+        isolateRead,
+        _IsolateArgs<int>(receivePort.sendPort, pseudoTerminalId),
+      );
+      return;
+    }
     final input = StreamController<List<int>>(sync: true);
     input.stream.transform(utf8.decoder).listen(_out.sink.add);
     while (true) {
@@ -257,6 +275,37 @@ class UnixPty implements PseudoTerminal {
 
   @override
   void schedulingRead() {
-    // TODO: implement schedulingRead
+    sendPort?.send(true);
+  }
+}
+
+class _IsolateArgs<T> {
+  _IsolateArgs(
+    this.sendPort,
+    this.arg,
+  );
+
+  final SendPort sendPort;
+  final T arg;
+}
+
+// 新isolate的入口函数
+Future<void> isolateRead(_IsolateArgs args) async {
+  // 实例化一个ReceivePort 以接收消息
+  final ReceivePort receivePort = ReceivePort();
+  args.sendPort.send(receivePort.sendPort);
+  final FileDescriptor fd = FileDescriptor(args.arg as int, nativeLibrary);
+
+  final input = StreamController<List<int>>(sync: true);
+
+  input.stream.transform(utf8.decoder).listen(args.sendPort.send);
+  // 把它的sendPort发送给宿主isolate，以便宿主可以给它发送消息
+
+  await for (final dynamic _ in receivePort) {
+    final Uint8List? result = fd.read(81920);
+    // Log.w('读取...$result');
+    if (result != null) {
+      input.sink.add(result);
+    }
   }
 }

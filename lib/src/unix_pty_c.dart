@@ -19,6 +19,7 @@ import 'unix_proc.dart';
 import 'utils/custom_utf.dart';
 
 // 这个需要配合c语言实现
+// 已经不需要了，待纯 dart 调用底层 api 稳定后移除
 
 void dartCallback(Pointer<Int8> int8) {
   Pointer<Utf8> utf8Pointer = int8.cast();
@@ -35,7 +36,7 @@ class UnixPtyC implements PseudoTerminal {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
-    release = false &
+    release = true |
         const bool.fromEnvironment(
           'dart.vm.product',
           defaultValue: false,
