@@ -26,17 +26,14 @@ class UnixPty implements PseudoTerminal {
     String workingDirectory = '',
     List<String> arguments = const [],
     Map<String, String> environment = const {},
+    this.useIsolate = false,
   }) {
-    release = const bool.fromEnvironment(
-      'dart.vm.product',
-      defaultValue: false,
-    );
     out = _out.stream.asBroadcastStream();
     // 这个函数实现的功能是完整的
     pseudoTerminalId = createPseudoTerminal();
     fd = FileDescriptor(pseudoTerminalId, nativeLibrary);
 
-    if (!release) {
+    if (!useIsolate) {
       fd.setNonblock(pseudoTerminalId);
     }
 
@@ -85,7 +82,7 @@ class UnixPty implements PseudoTerminal {
     // nativeLibrary.grantpt()
   }
 
-  late bool release;
+  final bool useIsolate;
   late FileDescriptor fd;
   // final NiUtf _niUtf = NiUtf();
   final int rowLen;
@@ -243,7 +240,7 @@ class UnixPty implements PseudoTerminal {
 
   SendPort? sendPort;
   Future<void> _startPolling() async {
-    if (release) {
+    if (useIsolate) {
       final ReceivePort receivePort = ReceivePort();
       receivePort.listen((dynamic msg) {
         if (sendPort == null) {

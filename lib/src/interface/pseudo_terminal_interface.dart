@@ -18,6 +18,7 @@ abstract class PseudoTerminal {
       'TERM': 'xterm-256color',
     },
     String? libPath,
+    bool useIsolate = false,
   }) {
     // TODO
     if (Platform.isMacOS) {
@@ -35,6 +36,7 @@ abstract class PseudoTerminal {
         executable: executable,
         arguments: arguments,
         environment: environment,
+        useIsolate: true,
       );
     } else if (Platform.isLinux) {
       libPath ??= 'dynamic_library/libterm.so';
@@ -58,6 +60,7 @@ abstract class PseudoTerminal {
       executable: executable,
       arguments: arguments,
       environment: environment,
+      useIsolate: true,
     );
   }
 
