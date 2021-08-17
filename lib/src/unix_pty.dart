@@ -233,6 +233,7 @@ class UnixPty implements PseudoTerminal {
     return readSync();
   }
 
+  bool pollingIsStart = false;
   @override
   void startPolling() {
     _startPolling();
@@ -240,15 +241,19 @@ class UnixPty implements PseudoTerminal {
 
   SendPort? sendPort;
   Future<void> _startPolling() async {
+    if (pollingIsStart) {
+      return;
+    }
+    pollingIsStart = true;
     if (useIsolate) {
       final ReceivePort receivePort = ReceivePort();
       receivePort.listen((dynamic msg) {
+        // Log.e('msg -> $msg ${msg.runtimeType}');
         if (sendPort == null) {
           sendPort = msg as SendPort;
           // 先让子 isolate 先读一次数据
           sendPort?.send(true);
         } else {
-          // Log.e('msg -> $msg');
           _out.sink.add(msg as String);
         }
       });
@@ -290,13 +295,13 @@ class _IsolateArgs<T> {
 Future<void> isolateRead(_IsolateArgs args) async {
   // 实例化一个ReceivePort 以接收消息
   final ReceivePort receivePort = ReceivePort();
+  // 把它的sendPort发送给宿主isolate，以便宿主可以给它发送消息
   args.sendPort.send(receivePort.sendPort);
   final FileDescriptor fd = FileDescriptor(args.arg as int, nativeLibrary);
 
   final input = StreamController<List<int>>(sync: true);
 
   input.stream.transform(utf8.decoder).listen(args.sendPort.send);
-  // 把它的sendPort发送给宿主isolate，以便宿主可以给它发送消息
 
   await for (final dynamic _ in receivePort) {
     final Uint8List? result = fd.read(81920);

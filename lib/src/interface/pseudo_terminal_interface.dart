@@ -60,7 +60,7 @@ abstract class PseudoTerminal {
       executable: executable,
       arguments: arguments,
       environment: environment,
-      useIsolate: true,
+      useIsolate: const bool.fromEnvironment('dart.vm.product'),
     );
   }
 
