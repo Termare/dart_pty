@@ -36,7 +36,7 @@ abstract class PseudoTerminal {
         executable: executable,
         arguments: arguments,
         environment: environment,
-        useIsolate: true,
+        useIsolate: const bool.fromEnvironment('dart.vm.product'),
       );
     } else if (Platform.isLinux) {
       libPath ??= 'dynamic_library/libterm.so';
