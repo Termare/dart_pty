@@ -1,10 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
-
-import '../proc.dart';
 import '../unix_pty.dart';
-import '../unix_pty_c.dart';
-import '../win_pty.dart';
 
 // 抽象函数的思想完全借鉴 pty 的代码.
 abstract class PseudoTerminal {
@@ -17,8 +13,7 @@ abstract class PseudoTerminal {
     Map<String, String> environment = const <String, String>{
       'TERM': 'xterm-256color',
     },
-    String? libPath,
-    bool useIsolate = false,
+    bool? useIsolate,
   }) {
     // TODO
     if (Platform.isMacOS) {
@@ -39,9 +34,7 @@ abstract class PseudoTerminal {
         useIsolate: const bool.fromEnvironment('dart.vm.product'),
       );
     } else if (Platform.isLinux) {
-      libPath ??= 'dynamic_library/libterm.so';
     } else if (Platform.isAndroid) {
-      libPath = 'libterm.so';
     } else if (Platform.isWindows) {
       // return WinPty(
       //   rowLen: row,
@@ -52,7 +45,6 @@ abstract class PseudoTerminal {
       //   environment: environment,
       // );
     }
-
     return UnixPty(
       rowLen: row,
       columnLen: column,
@@ -60,7 +52,7 @@ abstract class PseudoTerminal {
       executable: executable,
       arguments: arguments,
       environment: environment,
-      useIsolate: const bool.fromEnvironment('dart.vm.product'),
+      useIsolate: useIsolate ?? const bool.fromEnvironment('dart.vm.product'),
     );
   }
 

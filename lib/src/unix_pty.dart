@@ -36,7 +36,7 @@ class UnixPty implements PseudoTerminal {
     if (!useIsolate) {
       fd.setNonblock(pseudoTerminalId);
     }
-
+    Log.e('获取玩');
     _createSubprocess(
       executable!,
       workingDirectory: workingDirectory,
@@ -45,7 +45,7 @@ class UnixPty implements PseudoTerminal {
     );
   }
   // 创建一个pty，返回它的ptm文本描述符，这个ptm在之后的读写，fork子进程还会用到
-  int createPseudoTerminal({bool verbose = true}) {
+  int createPseudoTerminal() {
     Log.d('Create Start');
     final ptmxPath = '/dev/ptmx'.toNativeUtf8();
     final int ptm = nativeLibrary.open(
@@ -54,7 +54,7 @@ class UnixPty implements PseudoTerminal {
     );
     if (nativeLibrary.grantpt(ptm) != 0 || nativeLibrary.unlockpt(ptm) != 0) {
       // 说明二者有一个失败
-      print('Cannot grantpt()/unlockpt()/ptsname_r() on /dev/ptmx');
+      Log.e('Cannot grantpt()/unlockpt()/ptsname_r() on /dev/ptmx');
       return -1;
     }
     final Pointer<termios> tios = calloc<termios>();
@@ -97,9 +97,11 @@ class UnixPty implements PseudoTerminal {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
-    Pointer<Int8> devname = calloc<Int8>(1);
+    Pointer<Int8> devname = calloc<Int8>();
     // 获得pts路径
+    Log.d('123');
     devname = nativeLibrary.ptsname(pseudoTerminalId).cast();
+    Log.d(devname.cast<Utf8>().toDartString());
     final int pid = nativeLibrary.fork();
     if (pid < 0) {
       print('fork faild');
