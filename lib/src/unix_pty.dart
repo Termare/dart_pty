@@ -32,11 +32,9 @@ class UnixPty implements PseudoTerminal {
     // 这个函数实现的功能是完整的
     pseudoTerminalId = createPseudoTerminal();
     fd = FileDescriptor(pseudoTerminalId, nativeLibrary);
-
     if (!useIsolate) {
       fd.setNonblock(pseudoTerminalId);
     }
-    Log.e('获取玩');
     _createSubprocess(
       executable!,
       workingDirectory: workingDirectory,
