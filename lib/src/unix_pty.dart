@@ -97,7 +97,6 @@ class UnixPty implements PseudoTerminal {
   }) {
     Pointer<Int8> devname = calloc<Int8>();
     // 获得pts路径
-    Log.d('123');
     devname = nativeLibrary.ptsname(pseudoTerminalId).cast();
     Log.d(devname.cast<Utf8>().toDartString());
     final int pid = nativeLibrary.fork();
