@@ -26,11 +26,11 @@ class FileDescriptor {
   void setNonblock(int fd, {bool verbose = true}) {
     int flag = -1;
     flag = nativeLibrary.fcntl(fd, F_GETFL, 0); //获取当前flag
-    Log.d('> 当前flag = $flag');
+    Log.d('当前flag = $flag', tag: 'FileDescriptor');
     flag |= Platform.isAndroid ? O_NONBLOCK_ANDROID : O_NONBLOCK; //设置新falg
-    Log.d('> 设置新flag = $flag');
+    Log.d('设置新flag = $flag', tag: 'FileDescriptor');
     nativeLibrary.fcntl(fd, F_SETFL, flag); //更新flag
     flag = nativeLibrary.fcntl(fd, F_GETFL, 0); //获取当前flag
-    Log.d('> 再次获取到的flag = $flag');
+    Log.d('再次获取到的flag = $flag', tag: 'FileDescriptor');
   }
 }
