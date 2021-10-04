@@ -95,20 +95,21 @@ class UnixPty implements PseudoTerminal {
     List<String> arguments = const [],
     Map<String, String> environment = const {},
   }) {
+    final List<String> fullArg = [executable, ...arguments];
     Pointer<Int8> devname = calloc<Int8>();
     // 获得pts路径
     devname = nativeLibrary.ptsname(pseudoTerminalId).cast();
     Log.d(devname.cast<Utf8>().toDartString());
     final int pid = nativeLibrary.fork();
     if (pid < 0) {
-      print('fork faild');
+      Log.i('fork faild');
     } else if (pid > 0) {
-      print('fork 主进程');
+      Log.i('fork 主进程');
 
       // 这里会返回子进程的pid
       return UnixProc(pid);
     } else {
-      print('fork 子进程');
+      Log.i('fork 子进程');
       // Clear signals which the Android java process may have blocked:
       final Pointer<Uint32> signalsToUnblock = calloc<Uint32>();
       // sigset_t signals_to_unblock;
@@ -160,11 +161,12 @@ class UnixPty implements PseudoTerminal {
       }
 
       final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
-        platformEnvironment.length + 1,
+        fullArg.length + 1,
       );
-      for (int i = 0; i < arguments.length; i++) {
-        argv[i] = arguments[i].toNativeUtf8();
+      for (int i = 0; i < fullArg.length; i++) {
+        argv[i] = fullArg[i].toNativeUtf8();
       }
+      argv[fullArg.length] = nullptr;
       if (nativeLibrary.chdir(workingDirectory.toNativeUtf8().cast()) != 0) {
         // nativeLibrary.perror('切换工作目录失败'.toNativeUtf8().cast());
         // nativeLibrary.fflush(stderr);
