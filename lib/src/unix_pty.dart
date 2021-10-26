@@ -163,6 +163,7 @@ class UnixPty implements PseudoTerminal {
       final Pointer<Pointer<Utf8>> argv = calloc<Pointer<Utf8>>(
         fullArg.length + 1,
       );
+      // Log.e('fullArg -> $fullArg');
       for (int i = 0; i < fullArg.length; i++) {
         argv[i] = fullArg[i].toNativeUtf8();
       }
