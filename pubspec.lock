@@ -13,10 +13,10 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "8edb0192348d6e63ec63a3c653e6949fb9ff494d"
-      url: "https://github.com/Nightmare-MY/signale"
+      resolved-ref: "99e278923e468ca882dd13208255fd0944ad5da3"
+      url: "https://github.com/nightmare-space/signale"
     source: git
-    version: "0.0.3"
+    version: "0.0.6"
   win32:
     dependency: "direct main"
     description:

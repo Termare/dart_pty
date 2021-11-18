@@ -42,9 +42,10 @@ class UnixPty implements PseudoTerminal {
       environment: environment,
     );
   }
+  late Isolate readIsolate;
   // 创建一个pty，返回它的ptm文本描述符，这个ptm在之后的读写，fork子进程还会用到
   int createPseudoTerminal() {
-    Log.d('Create Start');
+    Log.d('Create Start', tag: 'Term');
     final ptmxPath = '/dev/ptmx'.toNativeUtf8();
     final int ptm = nativeLibrary.open(
       ptmxPath.cast<Int8>(),
@@ -74,8 +75,8 @@ class UnixPty implements PseudoTerminal {
     calloc.free(size);
     // free(ptmxPath);
 
-    Log.d('Create End');
-    Log.d('Ptm = $ptm');
+    Log.d('Create End', tag: 'Term');
+    Log.d('Ptm = $ptm', tag: 'Term');
     return ptm;
     // nativeLibrary.grantpt()
   }
@@ -259,10 +260,12 @@ class UnixPty implements PseudoTerminal {
           _out.sink.add(msg as String);
         }
       });
-      Isolate.spawn<_IsolateArgs>(
+      readIsolate = await Isolate.spawn<_IsolateArgs>(
         isolateRead,
         _IsolateArgs<int>(receivePort.sendPort, pseudoTerminalId),
       );
+      // Log.e('readIsolate -> $readIsolate');
+      // readIsolate.kill()
       return;
     }
     final input = StreamController<List<int>>(sync: true);
@@ -280,6 +283,12 @@ class UnixPty implements PseudoTerminal {
   @override
   void schedulingRead() {
     sendPort?.send(true);
+  }
+
+  @override
+  void close() {
+    sendPort?.send(false);
+    readIsolate.kill(priority: Isolate.immediate);
   }
 }
 
@@ -305,7 +314,11 @@ Future<void> isolateRead(_IsolateArgs args) async {
 
   input.stream.transform(utf8.decoder).listen(args.sendPort.send);
 
-  await for (final dynamic _ in receivePort) {
+  await for (final dynamic action in receivePort) {
+    if (!(action as bool)) {
+      Log.w('收到退出指令');
+      break;
+    }
     final Uint8List? result = fd.read(81920);
     // Log.w('读取...$result');
     if (result != null) {

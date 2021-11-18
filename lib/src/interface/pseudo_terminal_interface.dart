@@ -59,7 +59,7 @@ abstract class PseudoTerminal {
   // });
 
   String getTtyPath();
-  // void close();
+  void close();
 
   void startPolling();
   void schedulingRead();
