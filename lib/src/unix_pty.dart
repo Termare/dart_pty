@@ -42,7 +42,7 @@ class UnixPty implements PseudoTerminal {
       environment: environment,
     );
   }
-  late Isolate readIsolate;
+  Isolate? readIsolate;
   // 创建一个pty，返回它的ptm文本描述符，这个ptm在之后的读写，fork子进程还会用到
   int createPseudoTerminal() {
     Log.d('Create Start', tag: 'Term');
@@ -89,7 +89,7 @@ class UnixPty implements PseudoTerminal {
 
   @override
   late int pseudoTerminalId;
-
+  late int pid;
   Proc? _createSubprocess(
     String executable, {
     String workingDirectory = '.',
@@ -106,7 +106,7 @@ class UnixPty implements PseudoTerminal {
       Log.i('fork faild');
     } else if (pid > 0) {
       Log.i('fork 主进程');
-
+      this.pid = pid;
       // 这里会返回子进程的pid
       return UnixProc(pid);
     } else {
@@ -288,7 +288,8 @@ class UnixPty implements PseudoTerminal {
   @override
   void close() {
     sendPort?.send(false);
-    readIsolate.kill(priority: Isolate.immediate);
+    readIsolate?.kill(priority: Isolate.immediate);
+    nativeLibrary.kill(pid, SIGKILL);
   }
 }
 

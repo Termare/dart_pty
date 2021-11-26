@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:dart_pty/src/interface/pseudo_terminal_interface.dart';
 
 Future<void> main() async {
-  final Map<String, String> environment = {'TEST': 'TEST_VALUE'};
-  String executable = 'sh';
+  final Map<String, String> environment = {
+    'TERM': 'xterm-256color',
+  };
+  String executable = 'bash';
   if (Platform.isWindows) {
     executable = 'wsl';
   }
@@ -23,6 +25,9 @@ Future<void> main() async {
   await Future.delayed(const Duration(milliseconds: 100), () async {
     while (true) {
       final String input = stdin.readLineSync()!;
+      if(input=='exit'){
+        pseudoTerminal.close();
+      }
       input.split('').forEach((element) {
         pseudoTerminal.write(element);
       });
