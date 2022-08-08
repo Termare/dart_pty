@@ -1,7 +1,7 @@
 name: dart_pty
 description: create pseudo terminal and fork process use dart
-version: 0.0.3
-author: Nightmare_MYS<906262255@qq.com>
+version: 0.0.4
+author: mengyanshou<906262255@qq.com>
 homepage:
 
 environment:

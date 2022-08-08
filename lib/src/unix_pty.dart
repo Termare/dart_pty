@@ -114,14 +114,19 @@ class UnixPty implements PseudoTerminal {
       // Clear signals which the Android java process may have blocked:
       final Pointer<Uint32> signalsToUnblock = calloc<Uint32>();
       // sigset_t signals_to_unblock;
+      Log.i('sigfillset start');
       nativeLibrary.sigfillset(signalsToUnblock);
+      Log.i('sigfillset done');
       nativeLibrary.sigprocmask(
         SIG_UNBLOCK,
         signalsToUnblock,
-        Pointer.fromAddress(0),
+        nullptr,
       );
+      Log.i('sigprocmask done');
       nativeLibrary.close(pseudoTerminalId);
+      Log.i('close done');
       nativeLibrary.setsid();
+      Log.i('setsid done');
       final int pts = nativeLibrary.open(devname, O_RDWR);
       if (pts < 0) {
         return null;
@@ -129,6 +134,7 @@ class UnixPty implements PseudoTerminal {
       nativeLibrary.dup2(pts, 0);
       nativeLibrary.dup2(pts, 1);
       nativeLibrary.dup2(pts, 2);
+      Log.i('dup2 done');
       // final Pointer<DIR> selfDir = nativeLibrary.opendir(
       //   '/proc/self/fd'.toNativeUtf8().cast(),
       // );

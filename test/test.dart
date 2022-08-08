@@ -11,29 +11,30 @@ Future<void> main() async {
     executable = 'wsl';
   }
   final PseudoTerminal pseudoTerminal = PseudoTerminal(
-    executable: executable,
+    executable: 'ssh',
     environment: environment,
     workingDirectory: '/',
+    arguments:
+        '-o PreferredAuthentications=password -o PubkeyAuthentication=no -o PasswordAuthentication=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null nightmare@nightmare.fun'
+            .split(' '),
+    useIsolate: true,
   );
   await Future<void>.delayed(const Duration(milliseconds: 100));
-  pseudoTerminal.out!.listen((line) {
-    print('\x1b[31m' + '>' * 40);
-    print('\x1b[32m$line');
-    print('\x1b[31m' + '<' * 40);
-  });
   pseudoTerminal.startPolling();
-  await Future.delayed(const Duration(milliseconds: 100), () async {
-    while (true) {
-      final String input = stdin.readLineSync()!;
-      if(input=='exit'){
-        pseudoTerminal.close();
-      }
-      input.split('').forEach((element) {
-        pseudoTerminal.write(element);
-      });
-      pseudoTerminal.write('\n');
-      pseudoTerminal.schedulingRead();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+  pseudoTerminal.out!.listen((line) {
+    print('--->$line');
+    if (RegExp('yes/no').hasMatch(line)) {
+      pseudoTerminal.write('yes\n');
+    } else if (RegExp('assword:').hasMatch(line)) {
+      pseudoTerminal.write('xxx\n');
+    } else if (RegExp('Select account').hasMatch(line)) {
+      pseudoTerminal.write('2\n');
+    } else if (RegExp('~]').hasMatch(line)) {
+      pseudoTerminal.write('./run.sh\n');
+    } else {
+      print(line);
     }
+
+    pseudoTerminal.schedulingRead();
   });
 }
