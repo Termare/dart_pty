@@ -11,12 +11,10 @@ packages:
   signale:
     dependency: "direct main"
     description:
-      path: "."
-      ref: HEAD
-      resolved-ref: "99e278923e468ca882dd13208255fd0944ad5da3"
-      url: "https://github.com/nightmare-space/signale"
-    source: git
-    version: "0.0.6"
+      name: signale
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.0.7"
   win32:
     dependency: "direct main"
     description:
